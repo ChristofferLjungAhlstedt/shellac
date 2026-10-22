@@ -110,6 +110,34 @@ def available_theme_files(user_dir: Path | None = None) -> dict[str, Path]:
     return found
 
 
+def theme_ids(user_dir: Path | None = None) -> list[str]:
+    """All selectable theme ids (bundled and user), sorted."""
+    return sorted(available_theme_files(user_dir))
+
+
+def next_theme_id(current: str, ids: list[str]) -> str:
+    """The theme after ``current``, wrapping around (FR-38).
+
+    An unknown ``current`` (say, its file was just deleted) starts from the first one.
+    """
+    if not ids:
+        return current
+    if current not in ids:
+        return ids[0]
+    return ids[(ids.index(current) + 1) % len(ids)]
+
+
+def choose_theme_id(appearance: AppearanceConfig, system_dark: bool | None) -> str:
+    """Which theme the config asks for (FR-43).
+
+    With ``follow_system_scheme`` the system's dark/light preference picks between
+    ``dark_theme`` and ``light_theme``; otherwise ``theme`` is used as written.
+    """
+    if appearance.follow_system_scheme and system_dark is not None:
+        return appearance.dark_theme if system_dark else appearance.light_theme
+    return appearance.theme
+
+
 def get_theme(name: str, user_dir: Path | None = None) -> tuple[Theme, list[str]]:
     """Resolve ``name`` to a theme. Never raises: falls back to the default theme.
 
@@ -132,6 +160,24 @@ def get_theme(name: str, user_dir: Path | None = None) -> tuple[Theme, list[str]
 
 def hex_to_rgb(color: str) -> tuple[int, int, int]:
     return int(color[1:3], 16), int(color[3:5], 16), int(color[5:7], 16)
+
+
+def relative_luminance(color: str) -> float:
+    """WCAG relative luminance of a ``#rrggbb`` color (0 = black, 1 = white)."""
+
+    def channel(value: int) -> float:
+        c = value / 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = (channel(v) for v in hex_to_rgb(color))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(first: str, second: str) -> float:
+    """WCAG contrast ratio between two colors, from 1 (identical) to 21."""
+    a, b = relative_luminance(first), relative_luminance(second)
+    lighter, darker = max(a, b), min(a, b)
+    return (lighter + 0.05) / (darker + 0.05)
 
 
 def _rgba(color: str, alpha: float = 1.0) -> str:

@@ -44,6 +44,9 @@ class TabsConfig:
 class AppearanceConfig:
     theme: str = "catppuccin-mocha"
     follow_system_scheme: bool = False
+    # Used instead of ``theme`` when follow_system_scheme is on.
+    dark_theme: str = "catppuccin-mocha"
+    light_theme: str = "one-light"
     font_family: str = "JetBrainsMono Nerd Font"
     font_size: float = 12.0
     opacity: float = 0.95

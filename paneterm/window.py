@@ -45,9 +45,9 @@ class MainWindow(Adw.ApplicationWindow):
         self._tab_view.connect("notify::selected-page", self._on_selected_page_changed)
         self._tab_view.connect("page-detached", self._on_page_detached)
 
-        tab_bar = Adw.TabBar()
-        tab_bar.set_view(self._tab_view)
-        tab_bar.set_autohide(config.tabs.autohide)
+        self._tab_bar = Adw.TabBar()
+        self._tab_bar.set_view(self._tab_view)
+        self._tab_bar.set_autohide(config.tabs.autohide)
 
         new_tab_button = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="New tab")
         new_tab_button.set_action_name("win.new_tab")
@@ -59,7 +59,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(header)
-        toolbar.add_top_bar(tab_bar)
+        toolbar.add_top_bar(self._tab_bar)
         toolbar.set_content(self._toasts)
         self.set_content(toolbar)
 
@@ -72,6 +72,19 @@ class MainWindow(Adw.ApplicationWindow):
             self.show_toast(f"{len(warnings)} configuration {noun}. See the log for details.")
 
         self.connect("map", lambda *_: self._focus_current())
+
+    # -- config -------------------------------------------------------------------------
+
+    def apply_config(self, config: Config, theme: Theme) -> None:
+        """Apply a new config and theme to every pane in every tab at once (FR-38, FR-46).
+
+        New tabs and panes created afterwards use these too.
+        """
+        self._config = config
+        self._theme = theme
+        self._tab_bar.set_autohide(config.tabs.autohide)
+        for container in self._containers.values():
+            container.apply_style(config, theme)
 
     # -- tabs ---------------------------------------------------------------------------
 
@@ -167,6 +180,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._add_action("copy", on_pane("copy"))
         self._add_action("paste", on_pane("paste"))
+        self._add_action("cycle_theme", lambda: self.get_application().cycle_theme())
+        self._add_action("reload_config", lambda: self.get_application().reload_config())
         self._add_action("new_tab", self.new_tab)
         self._add_action("next_tab", lambda: self._select_tab_offset(1))
         self._add_action("prev_tab", lambda: self._select_tab_offset(-1))

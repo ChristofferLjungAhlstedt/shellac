@@ -1,0 +1,22 @@
+name = "Tokyo Night"
+dark = true
+
+[terminal]
+foreground = "#c0caf5"
+background = "#1a1b26"
+cursor = "#c0caf5"
+selection_background = "#33467c"
+selection_foreground = "#c0caf5"
+palette = [
+  "#15161e", "#f7768e", "#9ece6a", "#e0af68",
+  "#7aa2f7", "#bb9af7", "#7dcfff", "#a9b1d6",
+  "#414868", "#f7768e", "#9ece6a", "#e0af68",
+  "#7aa2f7", "#bb9af7", "#7dcfff", "#c0caf5",
+]
+
+[ui]
+accent = "#7aa2f7"
+sidebar_background = "#16161e"
+sidebar_foreground = "#c0caf5"
+tabbar_background = "#16161e"
+divider = "#292e42"

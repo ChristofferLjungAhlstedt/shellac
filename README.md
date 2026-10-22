@@ -14,7 +14,7 @@ Built milestone by milestone from the development specification.
 | --- | --- |
 | M1 Single terminal window | Done: themed window, VTE running your shell, copy/paste, config loading |
 | M2 Splits and tabs | Done: nested splits, close/collapse, directional focus, resize, pane zoom, tabs, working-directory inheritance |
-| M3 Config and themes (runtime switching, live reload, more themes) | Loader and validation done; runtime switching and bundled themes other than Catppuccin Mocha are not |
+| M3 Config and themes | Done: five bundled themes, runtime switching, live config reload, system light/dark following, rebindable keys |
 | M4 File tree sidebar | Not started |
 | M5 Git integration and polish | Not started |
 | M6 Packaging (`.desktop` file, icon) | Not started |
@@ -35,9 +35,13 @@ They are remappable in `[keybindings]`.
 | New tab / next / previous | Ctrl+Shift+T / Ctrl+PageDown / Ctrl+PageUp |
 | Jump to tab 1..9 (`goto_tab_1`..) | Alt+1..9 |
 | Copy / paste | Ctrl+Shift+C / Ctrl+Shift+V |
+| Cycle theme (`cycle_theme`) | Ctrl+Shift+P |
+| Reload config (`reload_config`) | Ctrl+Shift+R |
 
-Not yet wired up (later milestones): `toggle_sidebar`, `search`, `cycle_theme`, and
-Ctrl+Shift+R (reload config).
+Not yet wired up (later milestones): `toggle_sidebar` and `search`. They are accepted and
+validated in the config, but not bound.
+
+If two actions end up with the same accelerator, a warning is logged and shown as a toast.
 
 ## Install (Kubuntu / Ubuntu / Debian)
 
@@ -107,6 +111,9 @@ autohide = true          # hide the tab bar while only one tab is open
 
 [appearance]
 theme = "catppuccin-mocha"
+follow_system_scheme = false             # true: pick dark_theme or light_theme by the system
+dark_theme = "catppuccin-mocha"
+light_theme = "one-light"
 font_family = "JetBrainsMono Nerd Font"   # falls back to FiraCode/Iosevka NF, then Monospace
 font_size = 12
 opacity = 0.95           # terminal background only, never the text
@@ -122,6 +129,34 @@ paste = "<Ctrl><Shift>v"
 Keybindings for actions that are not implemented yet (splits, tabs, sidebar, ...) are
 accepted and validated but not bound until their milestone lands.
 
+## Themes
+
+Bundled: `catppuccin-mocha` (default), `tokyo-night`, `gruvbox-dark`, `nord` and
+`one-light`. **Ctrl+Shift+P** cycles through them, recoloring every pane, tab and the
+window chrome at once. Set one permanently with `theme = "nord"`.
+
+To add your own, drop a `.toml` file into `~/.config/paneterm/themes/` (the folder is
+created on first start). Copy one of the bundled files from the installed package as a
+template: `terminal` colors, a 16-entry `palette`, and `ui` colors for the chrome. A user
+theme with the same file name as a bundled one replaces it. Theme files are reloaded
+live, so you can edit one and watch it update.
+
+With `follow_system_scheme = true`, `dark_theme` or `light_theme` is chosen by the
+desktop's dark/light preference and changes when that does.
+
+## Live reload
+
+The config file and the themes folder are watched. Saving either applies the change to
+all open windows and panes within a moment, including fonts, colors, opacity, padding,
+the tab bar and keybindings. Ctrl+Shift+R reloads on demand.
+
+- A mistake never breaks a running window: an invalid value, an unknown theme or broken
+  TOML logs a warning, shows one toast, and uses the default for that value.
+- A theme picked with Ctrl+Shift+P lasts until the config is reloaded or edited. While
+  following the system scheme, cycling pauses the following until the next reload.
+- Settings that only matter at creation (`shell`, `login_shell`, window size) apply to
+  new panes and tabs, not to shells that are already running.
+
 ## Design decisions
 
 Where the spec was ambiguous, the simplest behavior was chosen:
@@ -134,6 +169,12 @@ Where the spec was ambiguous, the simplest behavior was chosen:
 - **Window size.** `[window] width/height` was added so there are no magic constants in
   widget code. Persisting the size between launches belongs to M5.
 
+- **Light theme.** `one-light` rather than Catppuccin Latte: Latte's yellow and magenta fall
+  below 2.5:1 contrast on its background. A unit test keeps every bundled theme readable
+  (body text at least 7:1, colored ANSI entries at least 2.5:1).
+- **Config folders.** paneterm creates `~/.config/paneterm/` and its `themes/` folder on
+  startup (not the config file itself). Directories are watched instead of the file, so
+  editors that save by renaming a temp file over it are handled.
 - **Split naming.** `split_down` puts the new pane below, `split_right` puts it beside,
   matching Terminator. Inside the code these are `Axis.VERTICAL` / `Axis.HORIZONTAL`
   (GTK's orientation of the children), which is the reverse of the everyday wording.

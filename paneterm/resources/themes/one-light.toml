@@ -1,0 +1,22 @@
+name = "One Light"
+dark = false
+
+[terminal]
+foreground = "#383a42"
+background = "#fafafa"
+cursor = "#526fff"
+selection_background = "#d0d7e5"
+selection_foreground = "#383a42"
+palette = [
+  "#383a42", "#e45649", "#50a14f", "#c18401",
+  "#0184bc", "#a626a4", "#0997b3", "#a0a1a7",
+  "#4f525e", "#e45649", "#50a14f", "#c18401",
+  "#0184bc", "#a626a4", "#0997b3", "#fafafa",
+]
+
+[ui]
+accent = "#4078f2"
+sidebar_background = "#f0f0f1"
+sidebar_foreground = "#383a42"
+tabbar_background = "#e8e8ea"
+divider = "#d3d3d7"

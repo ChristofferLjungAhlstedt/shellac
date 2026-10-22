@@ -32,6 +32,7 @@ DEFAULT_KEYBINDINGS: dict[str, str] = {
     "paste": "<Ctrl><Shift>v",
     "search": "<Ctrl><Shift>f",
     "cycle_theme": "<Ctrl><Shift>p",
+    "reload_config": "<Ctrl><Shift>r",
 }
 
 _MODIFIER_RE = re.compile(r"<([^<>]+)>")

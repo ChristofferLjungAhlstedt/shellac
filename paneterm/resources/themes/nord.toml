@@ -1,0 +1,22 @@
+name = "Nord"
+dark = true
+
+[terminal]
+foreground = "#d8dee9"
+background = "#2e3440"
+cursor = "#d8dee9"
+selection_background = "#434c5e"
+selection_foreground = "#d8dee9"
+palette = [
+  "#3b4252", "#bf616a", "#a3be8c", "#ebcb8b",
+  "#81a1c1", "#b48ead", "#88c0d0", "#e5e9f0",
+  "#4c566a", "#bf616a", "#a3be8c", "#ebcb8b",
+  "#81a1c1", "#b48ead", "#8fbcbb", "#eceff4",
+]
+
+[ui]
+accent = "#88c0d0"
+sidebar_background = "#292e39"
+sidebar_foreground = "#d8dee9"
+tabbar_background = "#242933"
+divider = "#3b4252"

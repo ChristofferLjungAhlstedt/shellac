@@ -9,10 +9,15 @@ from paneterm.theme import (
     PALETTE_SIZE,
     ThemeError,
     available_theme_files,
+    choose_theme_id,
+    contrast_ratio,
     generate_css,
     get_theme,
     load_theme_file,
+    next_theme_id,
     parse_theme,
+    relative_luminance,
+    theme_ids,
 )
 
 
@@ -104,3 +109,71 @@ def test_generated_css_uses_theme_colors_and_config():
     assert theme.tabbar_background in css
     assert "padding: 12px" in css
     assert "0.500" in css
+
+
+# -- M3: bundled themes, cycling, system scheme ------------------------------------------
+
+BUNDLED_IDS = ["catppuccin-mocha", "gruvbox-dark", "nord", "one-light", "tokyo-night"]
+
+
+def test_all_five_bundled_themes_are_present_and_load():
+    assert [i for i in theme_ids(Path("/nonexistent")) if i in BUNDLED_IDS] == BUNDLED_IDS
+    for theme_id in BUNDLED_IDS:
+        assert load_theme_file(BUNDLED_THEMES_DIR / f"{theme_id}.toml").id == theme_id
+
+
+@pytest.mark.parametrize("theme_id", BUNDLED_IDS)
+def test_dark_flag_matches_the_background(theme_id: str):
+    theme = load_theme_file(BUNDLED_THEMES_DIR / f"{theme_id}.toml")
+    assert (relative_luminance(theme.background) < 0.5) == theme.dark
+
+
+@pytest.mark.parametrize("theme_id", BUNDLED_IDS)
+def test_bundled_themes_are_readable(theme_id: str):
+    """NFR-6: body text must be clearly readable, and the colored ANSI entries
+    (red..cyan, normal and bright) must stay distinguishable from the background."""
+    theme = load_theme_file(BUNDLED_THEMES_DIR / f"{theme_id}.toml")
+    assert contrast_ratio(theme.foreground, theme.background) >= 7.0
+    assert contrast_ratio(theme.selection_foreground, theme.selection_background) >= 4.5
+    for index in [*range(1, 7), *range(9, 15)]:
+        ratio = contrast_ratio(theme.palette[index], theme.background)
+        assert ratio >= 2.5, f"palette[{index}] {theme.palette[index]} only {ratio:.2f}:1"
+
+
+def test_contrast_ratio_extremes():
+    assert contrast_ratio("#000000", "#ffffff") == pytest.approx(21.0)
+    assert contrast_ratio("#777777", "#777777") == pytest.approx(1.0)
+
+
+def test_theme_ids_include_user_themes(tmp_path: Path):
+    (tmp_path / "mine.toml").write_text("")
+    ids = theme_ids(tmp_path)
+    assert "mine" in ids
+    assert ids == sorted(ids)
+
+
+def test_next_theme_id_cycles_and_wraps():
+    ids = ["a", "b", "c"]
+    assert next_theme_id("a", ids) == "b"
+    assert next_theme_id("c", ids) == "a"
+    assert next_theme_id("gone", ids) == "a"
+    assert next_theme_id("x", []) == "x"
+
+
+def test_choose_theme_id_without_following_uses_theme():
+    appearance = AppearanceConfig(theme="nord", dark_theme="tokyo-night", light_theme="one-light")
+    assert choose_theme_id(appearance, system_dark=True) == "nord"
+    assert choose_theme_id(appearance, system_dark=None) == "nord"
+
+
+def test_choose_theme_id_following_picks_by_system_scheme():
+    appearance = AppearanceConfig(
+        theme="nord",
+        follow_system_scheme=True,
+        dark_theme="tokyo-night",
+        light_theme="one-light",
+    )
+    assert choose_theme_id(appearance, system_dark=True) == "tokyo-night"
+    assert choose_theme_id(appearance, system_dark=False) == "one-light"
+    # Unknown system preference: fall back to the plain theme setting.
+    assert choose_theme_id(appearance, system_dark=None) == "nord"
