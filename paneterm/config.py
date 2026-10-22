@@ -1,0 +1,234 @@
+"""Load, validate and merge the TOML config (FR-44, FR-45).
+
+GTK-free. A missing, partial or invalid file never raises: bad values are
+replaced by their defaults and reported through ``LoadResult.warnings``.
+"""
+
+from __future__ import annotations
+
+import os
+import tomllib
+from dataclasses import dataclass, field, fields
+from pathlib import Path
+from typing import Any
+
+from . import APP_NAME
+from .keybindings import DEFAULT_KEYBINDINGS, find_conflicts, normalize_accelerator
+
+
+@dataclass
+class GeneralConfig:
+    shell: str = ""  # empty = $SHELL, then /bin/zsh, then /bin/bash
+    login_shell: bool = True  # pass -l to the shell (FR-1 asks for a login shell)
+    scrollback_lines: int = 10000
+    confirm_close_running: bool = True
+
+
+@dataclass
+class WindowConfig:
+    width: int = 1000
+    height: int = 640
+
+
+@dataclass
+class AppearanceConfig:
+    theme: str = "catppuccin-mocha"
+    follow_system_scheme: bool = False
+    font_family: str = "JetBrainsMono Nerd Font"
+    font_size: float = 12.0
+    opacity: float = 0.95
+    padding: int = 8
+    pane_spacing: int = 1
+    focus_indicator: str = "border"  # border | dim | none
+    cursor_shape: str = "block"  # block | ibeam | underline
+    cursor_blink: bool = False
+
+
+@dataclass
+class SidebarConfig:
+    visible: bool = True
+    width: int = 260
+    follow_cwd: bool = True
+    show_hidden: bool = False
+    hide_gitignored: bool = False
+    on_file_activate: str = "editor_split"  # editor_split | paste_path | desktop_open
+    on_dir_activate: str = "cd"  # cd | reroot
+
+
+@dataclass
+class Config:
+    general: GeneralConfig = field(default_factory=GeneralConfig)
+    window: WindowConfig = field(default_factory=WindowConfig)
+    appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
+    sidebar: SidebarConfig = field(default_factory=SidebarConfig)
+    keybindings: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_KEYBINDINGS))
+
+
+@dataclass
+class LoadResult:
+    config: Config
+    warnings: list[str] = field(default_factory=list)
+    path: Path | None = None
+
+
+# Allowed values for string options, keyed by (section, option).
+ENUMS: dict[tuple[str, str], frozenset[str]] = {
+    ("appearance", "focus_indicator"): frozenset({"border", "dim", "none"}),
+    ("appearance", "cursor_shape"): frozenset({"block", "ibeam", "underline"}),
+    ("sidebar", "on_file_activate"): frozenset({"editor_split", "paste_path", "desktop_open"}),
+    ("sidebar", "on_dir_activate"): frozenset({"cd", "reroot"}),
+}
+
+# Inclusive numeric ranges, keyed by (section, option).
+RANGES: dict[tuple[str, str], tuple[float, float]] = {
+    ("general", "scrollback_lines"): (0, 1_000_000),
+    ("window", "width"): (200, 10_000),
+    ("window", "height"): (150, 10_000),
+    ("appearance", "font_size"): (4, 72),
+    ("appearance", "opacity"): (0.0, 1.0),
+    ("appearance", "padding"): (0, 200),
+    ("appearance", "pane_spacing"): (0, 20),
+    ("sidebar", "width"): (100, 1000),
+}
+
+_SECTIONS: dict[str, type] = {
+    "general": GeneralConfig,
+    "window": WindowConfig,
+    "appearance": AppearanceConfig,
+    "sidebar": SidebarConfig,
+}
+
+
+def config_dir() -> Path:
+    """``$XDG_CONFIG_HOME/<appname>`` (default ``~/.config/<appname>``)."""
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / APP_NAME
+
+
+def config_path() -> Path:
+    return config_dir() / "config.toml"
+
+
+def user_themes_dir() -> Path:
+    return config_dir() / "themes"
+
+
+def _type_matches(value: Any, default: Any) -> bool:
+    # bool is a subclass of int, so check it explicitly in both directions.
+    if isinstance(default, bool):
+        return isinstance(value, bool)
+    if isinstance(default, int):
+        return isinstance(value, int) and not isinstance(value, bool)
+    if isinstance(default, float):
+        return isinstance(value, int | float) and not isinstance(value, bool)
+    if isinstance(default, str):
+        return isinstance(value, str)
+    return False
+
+
+def _build_section(name: str, cls: type, raw: Any, warnings: list[str]) -> Any:
+    instance = cls()
+    if raw is None:
+        return instance
+    if not isinstance(raw, dict):
+        warnings.append(f"[{name}] must be a table; using defaults")
+        return instance
+
+    known = {f.name for f in fields(cls)}
+    for key in raw:
+        if key not in known:
+            warnings.append(f"[{name}] unknown option '{key}' ignored")
+
+    for f in fields(cls):
+        if f.name not in raw:
+            continue
+        value = raw[f.name]
+        default = getattr(instance, f.name)
+        label = f"[{name}] {f.name}"
+
+        if not _type_matches(value, default):
+            warnings.append(
+                f"{label}: expected {type(default).__name__}, got {type(value).__name__}; "
+                f"using default {default!r}"
+            )
+            continue
+        allowed = ENUMS.get((name, f.name))
+        if allowed is not None and value not in allowed:
+            warnings.append(
+                f"{label}: {value!r} is not one of {sorted(allowed)}; using default {default!r}"
+            )
+            continue
+        bounds = RANGES.get((name, f.name))
+        if bounds is not None and not bounds[0] <= value <= bounds[1]:
+            warnings.append(
+                f"{label}: {value!r} is outside {bounds[0]}..{bounds[1]}; using default {default!r}"
+            )
+            continue
+        # Keep floats as floats even if the user wrote an integer (font_size = 12).
+        setattr(instance, f.name, float(value) if isinstance(default, float) else value)
+    return instance
+
+
+def _build_keybindings(raw: Any, warnings: list[str]) -> dict[str, str]:
+    bindings = dict(DEFAULT_KEYBINDINGS)
+    if raw is None:
+        return bindings
+    if not isinstance(raw, dict):
+        warnings.append("[keybindings] must be a table; using defaults")
+        return bindings
+
+    for action, accel in raw.items():
+        if action not in DEFAULT_KEYBINDINGS:
+            warnings.append(f"[keybindings] unknown action '{action}' ignored")
+            continue
+        if not isinstance(accel, str) or normalize_accelerator(accel) is None:
+            warnings.append(
+                f"[keybindings] {action}: invalid accelerator {accel!r}; "
+                f"using default {DEFAULT_KEYBINDINGS[action]!r}"
+            )
+            continue
+        bindings[action] = accel
+
+    for first, second in find_conflicts(bindings):
+        warnings.append(
+            f"[keybindings] '{first}' and '{second}' share the accelerator {bindings[first]!r}"
+        )
+    return bindings
+
+
+def parse_config(data: dict[str, Any]) -> LoadResult:
+    """Validate already-parsed TOML data and merge it over the defaults."""
+    warnings: list[str] = []
+    sections = {
+        name: _build_section(name, cls, data.get(name), warnings) for name, cls in _SECTIONS.items()
+    }
+    for key in data:
+        if key not in _SECTIONS and key != "keybindings":
+            warnings.append(f"unknown section [{key}] ignored")
+    config = Config(**sections, keybindings=_build_keybindings(data.get("keybindings"), warnings))
+    return LoadResult(config=config, warnings=warnings)
+
+
+def load_config(path: Path | None = None) -> LoadResult:
+    """Load the config file. Never raises; problems become warnings."""
+    path = path or config_path()
+    try:
+        with path.open("rb") as fh:
+            data = tomllib.load(fh)
+    except FileNotFoundError:
+        return LoadResult(config=Config(), path=path)
+    except tomllib.TOMLDecodeError as exc:
+        return LoadResult(
+            config=Config(),
+            warnings=[f"{path}: invalid TOML ({exc}); using defaults"],
+            path=path,
+        )
+    except OSError as exc:
+        return LoadResult(
+            config=Config(),
+            warnings=[f"{path}: cannot be read ({exc.strerror}); using defaults"],
+            path=path,
+        )
+    result = parse_config(data)
+    result.path = path
+    return result

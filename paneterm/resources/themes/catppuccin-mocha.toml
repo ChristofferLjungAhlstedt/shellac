@@ -1,0 +1,22 @@
+name = "Catppuccin Mocha"
+dark = true
+
+[terminal]
+foreground = "#cdd6f4"
+background = "#1e1e2e"
+cursor = "#f5e0dc"
+selection_background = "#585b70"
+selection_foreground = "#cdd6f4"
+palette = [
+  "#45475a", "#f38ba8", "#a6e3a1", "#f9e2af",
+  "#89b4fa", "#f5c2e7", "#94e2d5", "#bac2de",
+  "#585b70", "#f38ba8", "#a6e3a1", "#f9e2af",
+  "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8",
+]
+
+[ui]
+accent = "#89b4fa"
+sidebar_background = "#181825"
+sidebar_foreground = "#cdd6f4"
+tabbar_background = "#11111b"
+divider = "#313244"

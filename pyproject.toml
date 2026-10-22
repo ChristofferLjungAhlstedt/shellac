@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+# "paneterm" is a working title; see the spec's "Name and branding" risk.
+name = "paneterm"
+version = "0.1.0"
+description = "A good-looking Linux terminal emulator with fast pane splitting and a file tree sidebar (GTK4, libadwaita, VTE)"
+readme = "README.md"
+requires-python = ">=3.11"
+# PyGObject is deliberately not listed: it must come from the distro
+# (python3-gi) together with the GTK, libadwaita and VTE typelibs.
+# Install with `pipx install --system-site-packages .`
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff>=0.5"]
+
+[project.scripts]
+paneterm = "paneterm.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["paneterm*"]
+
+[tool.setuptools.package-data]
+paneterm = ["resources/themes/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# The shell snippet is a single dense zsh line by design.
+"paneterm/shell_integration.py" = ["E501"]
