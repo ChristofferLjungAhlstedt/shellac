@@ -28,5 +28,18 @@ def test_conflict_detected_across_spellings():
 
 def test_defaults_never_bind_a_bare_ctrl_letter():
     for action, accel in DEFAULT_KEYBINDINGS.items():
-        mods, _key = normalize_accelerator(accel)
-        assert mods != frozenset({"control"}), action
+        mods, key = normalize_accelerator(accel)
+        assert not (mods == frozenset({"control"}) and len(key) == 1), action
+
+
+def test_m2_actions_have_defaults():
+    for action in (
+        "resize_left",
+        "resize_down",
+        "next_tab",
+        "prev_tab",
+        "goto_tab_1",
+        "goto_tab_9",
+    ):
+        assert action in DEFAULT_KEYBINDINGS
+    assert "goto_tab_10" not in DEFAULT_KEYBINDINGS

@@ -6,8 +6,10 @@ GTK-free so it can be unit tested.
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+import socket
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 FALLBACK_SHELLS = ("/bin/zsh", "/bin/bash")
 LAST_RESORT_SHELL = "/bin/sh"
@@ -37,6 +39,41 @@ def build_environment(base: Mapping[str, str] | None = None) -> list[str]:
     env["TERM"] = TERM_VALUE
     env["COLORTERM"] = COLORTERM_VALUE
     return [f"{key}={value}" for key, value in env.items()]
+
+
+def local_hostnames() -> set[str]:
+    """Names this machine may report in an OSC 7 URI (the zsh snippet sends ``$HOST``)."""
+    full = socket.gethostname().lower()
+    return {"localhost", full, full.split(".")[0]}
+
+
+def cwd_from_uri(uri: str | None, hostnames: Iterable[str] | None = None) -> str | None:
+    """Local directory from a ``current-directory-uri`` value (OSC 7), or None.
+
+    A URI naming another host is ignored: inside ``ssh``, the remote shell reports
+    its own path, which must not be used as a local working directory.
+    """
+    if not uri:
+        return None
+    parsed = urlparse(uri)
+    if parsed.scheme != "file":
+        return None
+    host = (parsed.hostname or "").lower()
+    names = hostnames if hostnames is not None else local_hostnames()
+    allowed = {name.lower() for name in names} | {"localhost"}
+    if host and host not in allowed:
+        return None
+    return unquote(parsed.path) or None
+
+
+def read_proc_cwd(pid: int | None) -> str | None:
+    """Fallback when OSC 7 is not available: the shell's cwd from ``/proc`` (FR-9)."""
+    if pid is None:
+        return None
+    try:
+        return os.readlink(f"/proc/{pid}/cwd")
+    except OSError:
+        return None
 
 
 def resolve_working_directory(preferred: str | None, home: str | None = None) -> str:

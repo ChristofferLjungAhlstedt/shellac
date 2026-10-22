@@ -19,12 +19,30 @@ from .window import MainWindow  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-# Config action name -> Gio action. An action is only bound once the milestone that
-# implements it has landed; the other configured bindings are simply not registered yet.
-ACTION_TARGETS: dict[str, str] = {
-    "copy": "win.copy",
-    "paste": "win.paste",
-}
+# Actions the window implements, bound as ``win.<name>``. An action is only bound once
+# the milestone that implements it has landed; the remaining configured bindings
+# (toggle_sidebar, search, cycle_theme) are accepted but not registered yet.
+IMPLEMENTED_ACTIONS = (
+    "copy",
+    "paste",
+    "split_down",
+    "split_right",
+    "close_pane",
+    "zoom_pane",
+    "focus_left",
+    "focus_right",
+    "focus_up",
+    "focus_down",
+    "resize_left",
+    "resize_right",
+    "resize_up",
+    "resize_down",
+    "new_tab",
+    "next_tab",
+    "prev_tab",
+    *(f"goto_tab_{n}" for n in range(1, 10)),
+)
+ACTION_TARGETS: dict[str, str] = {name: f"win.{name}" for name in IMPLEMENTED_ACTIONS}
 
 
 class Application(Adw.Application):

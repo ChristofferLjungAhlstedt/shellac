@@ -13,11 +13,31 @@ Built milestone by milestone from the development specification.
 | Milestone | State |
 | --- | --- |
 | M1 Single terminal window | Done: themed window, VTE running your shell, copy/paste, config loading |
-| M2 Splits and tabs | Not started |
+| M2 Splits and tabs | Done: nested splits, close/collapse, directional focus, resize, pane zoom, tabs, working-directory inheritance |
 | M3 Config and themes (runtime switching, live reload, more themes) | Loader and validation done; runtime switching and bundled themes other than Catppuccin Mocha are not |
 | M4 File tree sidebar | Not started |
 | M5 Git integration and polish | Not started |
 | M6 Packaging (`.desktop` file, icon) | Not started |
+
+## Keybindings
+
+All bindings use Ctrl+Shift or Ctrl+Alt, so they never collide with shell shortcuts.
+They are remappable in `[keybindings]`.
+
+| Action | Default |
+| --- | --- |
+| Split, new pane below (`split_down`) | Ctrl+Shift+O |
+| Split, new pane to the right (`split_right`) | Ctrl+Shift+E |
+| Close pane (`close_pane`) | Ctrl+Shift+W |
+| Zoom / unzoom pane (`zoom_pane`) | Ctrl+Shift+Z |
+| Move focus (`focus_left/right/up/down`) | Ctrl+Alt+Arrows |
+| Resize pane (`resize_left/right/up/down`) | Ctrl+Shift+Alt+Arrows |
+| New tab / next / previous | Ctrl+Shift+T / Ctrl+PageDown / Ctrl+PageUp |
+| Jump to tab 1..9 (`goto_tab_1`..) | Alt+1..9 |
+| Copy / paste | Ctrl+Shift+C / Ctrl+Shift+V |
+
+Not yet wired up (later milestones): `toggle_sidebar`, `search`, `cycle_theme`, and
+Ctrl+Shift+R (reload config).
 
 ## Install (Kubuntu / Ubuntu / Debian)
 
@@ -79,6 +99,12 @@ scrollback_lines = 10000
 width = 1000
 height = 640
 
+[panes]
+resize_step = 40         # pixels moved by one keyboard resize
+
+[tabs]
+autohide = true          # hide the tab bar while only one tab is open
+
 [appearance]
 theme = "catppuccin-mocha"
 font_family = "JetBrainsMono Nerd Font"   # falls back to FiraCode/Iosevka NF, then Monospace
@@ -107,6 +133,19 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   from whichever terminal launched paneterm would advertise the wrong capabilities.
 - **Window size.** `[window] width/height` was added so there are no magic constants in
   widget code. Persisting the size between launches belongs to M5.
+
+- **Split naming.** `split_down` puts the new pane below, `split_right` puts it beside,
+  matching Terminator. Inside the code these are `Axis.VERTICAL` / `Axis.HORIZONTAL`
+  (GTK's orientation of the children), which is the reverse of the everyday wording.
+- **Focus indicator.** `focus_indicator = "border"` draws a 1 px accent outline over the
+  pane, so it never changes the pane's size. It only shows while several panes are visible.
+- **Remote shells.** Inside `ssh`, the remote shell's OSC 7 reports its own path. A URI
+  naming another host is ignored, so a new split opens in a local directory instead.
+- **Close behavior.** Closing a pane sends its shell SIGHUP. There is no "confirm close
+  while a command is running" prompt yet (`confirm_close_running` is parsed but unused).
+- **Known cosmetic warning.** Closing a pane programmatically in an unfocused window can log
+  a GTK `gtk_paned_set_focus_child` warning. It did not appear with real keypresses in a
+  focused window, and has no visible effect.
 
 ## Development
 

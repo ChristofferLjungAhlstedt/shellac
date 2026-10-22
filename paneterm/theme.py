@@ -170,4 +170,31 @@ window.paneterm headerbar {{
 vte-terminal {{
   padding: {appearance.padding}px;
 }}
+
+/* Thin visible divider between panes (FR-41). */
+paned > separator {{
+  min-width: {appearance.pane_spacing}px;
+  min-height: {appearance.pane_spacing}px;
+  background-color: {theme.divider};
+  background-image: none;
+}}
+{_focus_indicator_css(theme, appearance)}"""
+
+
+def _focus_indicator_css(theme: Theme, appearance: AppearanceConfig) -> str:
+    """Rules marking the focused pane (FR-19). Only applies while several panes are visible."""
+    if appearance.focus_indicator == "border":
+        # An outline is drawn over the content and never changes the pane's size.
+        return f"""
+.paneterm-multi .paneterm-pane.focused {{
+  outline: 1px solid {theme.accent};
+  outline-offset: -1px;
+}}
 """
+    if appearance.focus_indicator == "dim":
+        return """
+.paneterm-multi .paneterm-pane:not(.focused) {
+  opacity: 0.7;
+}
+"""
+    return ""

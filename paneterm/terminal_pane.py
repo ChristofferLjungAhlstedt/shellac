@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
+import os
+import signal
 from collections.abc import Callable
 
 import gi
@@ -12,7 +15,13 @@ gi.require_version("Vte", "3.91")
 from gi.repository import Gdk, GLib, Gtk, Pango, Vte  # noqa: E402
 
 from .config import Config  # noqa: E402
-from .shell import build_environment, resolve_shell, resolve_working_directory  # noqa: E402
+from .shell import (  # noqa: E402
+    build_environment,
+    cwd_from_uri,
+    read_proc_cwd,
+    resolve_shell,
+    resolve_working_directory,
+)
 from .theme import Theme  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -21,11 +30,16 @@ log = logging.getLogger(__name__)
 # and finally falls back to the system monospace font (FR-39).
 FALLBACK_FONT_FAMILIES = ("JetBrainsMono Nerd Font", "FiraCode Nerd Font", "Iosevka", "Monospace")
 
+DEFAULT_TITLE = "Terminal"
+PANE_CSS_CLASS = "paneterm-pane"
+
 _CURSOR_SHAPES = {
     "block": Vte.CursorShape.BLOCK,
     "ibeam": Vte.CursorShape.IBEAM,
     "underline": Vte.CursorShape.UNDERLINE,
 }
+
+PaneCallback = Callable[["TerminalPane"], None]
 
 
 def _rgba(color: str, alpha: float = 1.0) -> Gdk.RGBA:
@@ -55,10 +69,13 @@ class TerminalPane:
         *,
         cwd: str | None = None,
         on_exited: Callable[[TerminalPane, int], None] | None = None,
-        on_title_changed: Callable[[TerminalPane, str], None] | None = None,
+        on_title_changed: PaneCallback | None = None,
+        on_focus: PaneCallback | None = None,
     ) -> None:
         self._on_exited = on_exited
         self._on_title_changed = on_title_changed
+        self._on_focus = on_focus
+        self._closed = False
         self.child_pid: int | None = None
 
         self.terminal = Vte.Terminal()
@@ -67,13 +84,18 @@ class TerminalPane:
 
         # Vte.Terminal implements Gtk.Scrollable, so a ScrolledWindow gives us the scrollbar.
         self.widget = Gtk.ScrolledWindow()
+        self.widget.add_css_class(PANE_CSS_CLASS)
         self.widget.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.widget.set_child(self.terminal)
 
         self._handlers = [
             self.terminal.connect("child-exited", self._handle_child_exited),
             self.terminal.connect("window-title-changed", self._handle_title_changed),
+            self.terminal.connect("notify::current-directory-uri", self._handle_title_changed),
         ]
+        self._focus_controller: Gtk.EventControllerFocus | None = Gtk.EventControllerFocus()
+        self._focus_handler = self._focus_controller.connect("enter", self._handle_focus_enter)
+        self.terminal.add_controller(self._focus_controller)
 
         self.apply_style(config, theme)
         self._spawn(config, cwd)
@@ -137,9 +159,31 @@ class TerminalPane:
         if self._on_exited is not None:
             self._on_exited(self, status)
 
-    def _handle_title_changed(self, terminal: Vte.Terminal) -> None:
+    # -- state --------------------------------------------------------------------------
+
+    def current_directory(self) -> str | None:
+        """OSC 7 first, then ``/proc/<pid>/cwd`` (FR-9). Callers verify it still exists."""
+        return cwd_from_uri(self.terminal.get_current_directory_uri()) or read_proc_cwd(
+            self.child_pid
+        )
+
+    def display_title(self) -> str:
+        """The title the shell set, else the directory name, else a generic label."""
+        title = self.terminal.get_window_title()
+        if title:
+            return title
+        cwd = self.current_directory()
+        if cwd:
+            return os.path.basename(cwd.rstrip("/")) or "/"
+        return DEFAULT_TITLE
+
+    def _handle_title_changed(self, *_args: object) -> None:
         if self._on_title_changed is not None:
-            self._on_title_changed(self, terminal.get_window_title() or "")
+            self._on_title_changed(self)
+
+    def _handle_focus_enter(self, _controller: Gtk.EventControllerFocus) -> None:
+        if self._on_focus is not None:
+            self._on_focus(self)
 
     # -- clipboard and focus ------------------------------------------------------------
 
@@ -154,10 +198,24 @@ class TerminalPane:
 
     # -- cleanup ------------------------------------------------------------------------
 
-    def close(self) -> None:
-        """Disconnect handlers so a closed pane can be garbage collected (NFR-4)."""
+    def close(self, *, terminate: bool = True) -> None:
+        """Release handlers and end the shell, so a closed pane leaves nothing behind (NFR-4)."""
+        if self._closed:
+            return
+        self._closed = True
         for handler in self._handlers:
             self.terminal.disconnect(handler)
         self._handlers.clear()
+        # The controller's handler references this pane; disconnect it and drop the
+        # controller, or pane and terminal would keep each other alive forever.
+        if self._focus_controller is not None:
+            self._focus_controller.disconnect(self._focus_handler)
+            self.terminal.remove_controller(self._focus_controller)
+            self._focus_controller = None
         self._on_exited = None
         self._on_title_changed = None
+        self._on_focus = None
+        if terminate and self.child_pid is not None:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(self.child_pid, signal.SIGHUP)
+            self.child_pid = None

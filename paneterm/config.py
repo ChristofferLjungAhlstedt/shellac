@@ -31,6 +31,16 @@ class WindowConfig:
 
 
 @dataclass
+class PanesConfig:
+    resize_step: int = 40  # pixels moved by one keyboard resize (FR-17)
+
+
+@dataclass
+class TabsConfig:
+    autohide: bool = True  # hide the tab bar while only one tab is open (FR-23)
+
+
+@dataclass
 class AppearanceConfig:
     theme: str = "catppuccin-mocha"
     follow_system_scheme: bool = False
@@ -59,6 +69,8 @@ class SidebarConfig:
 class Config:
     general: GeneralConfig = field(default_factory=GeneralConfig)
     window: WindowConfig = field(default_factory=WindowConfig)
+    panes: PanesConfig = field(default_factory=PanesConfig)
+    tabs: TabsConfig = field(default_factory=TabsConfig)
     appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
     sidebar: SidebarConfig = field(default_factory=SidebarConfig)
     keybindings: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_KEYBINDINGS))
@@ -84,6 +96,7 @@ RANGES: dict[tuple[str, str], tuple[float, float]] = {
     ("general", "scrollback_lines"): (0, 1_000_000),
     ("window", "width"): (200, 10_000),
     ("window", "height"): (150, 10_000),
+    ("panes", "resize_step"): (1, 1000),
     ("appearance", "font_size"): (4, 72),
     ("appearance", "opacity"): (0.0, 1.0),
     ("appearance", "padding"): (0, 200),
@@ -94,6 +107,8 @@ RANGES: dict[tuple[str, str], tuple[float, float]] = {
 _SECTIONS: dict[str, type] = {
     "general": GeneralConfig,
     "window": WindowConfig,
+    "panes": PanesConfig,
+    "tabs": TabsConfig,
     "appearance": AppearanceConfig,
     "sidebar": SidebarConfig,
 }
