@@ -29,6 +29,7 @@ from .file_tree_model import (  # noqa: E402
     list_directory,
     nearest_existing_dir,
 )
+from .git_status import MARKERS, GitInfo, load_git_info  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -36,8 +37,12 @@ ICONS_DIR = Path(__file__).parent / "resources" / "icons"
 SCAN_THREADS = 4
 EVENT_DEBOUNCE_MS = 100  # wait this long after the last file system event before re-listing
 CSS_CLASS = "paneterm-sidebar"
+GIT_STATE_FILES = frozenset({"index", "HEAD", "packed-refs", "MERGE_HEAD"})
+GIT_DEBOUNCE_MS = 300  # wait for a burst of changes to settle before asking git again
+GIT_STATUSES = tuple(MARKERS)
 MIN_NAME_LENGTH = 1
 
+_CONTENT_EVENTS = {Gio.FileMonitorEvent.CHANGES_DONE_HINT}
 _REFRESH_EVENTS = {
     Gio.FileMonitorEvent.CREATED,
     Gio.FileMonitorEvent.DELETED,
@@ -70,11 +75,13 @@ class _Row(Gtk.Box):
         self.arrow = Gtk.Image(pixel_size=12)
         self.icon = Gtk.Image(pixel_size=16)
         self.label = Gtk.Label(xalign=0.0, hexpand=True, ellipsize=3)  # END
-        for child in (self.spacer, self.arrow, self.icon, self.label):
+        self.marker = Gtk.Label(width_chars=2, xalign=0.5)
+        self.marker.add_css_class("git-marker")
+        for child in (self.spacer, self.arrow, self.icon, self.label, self.marker):
             self.append(child)
         self.item: RowItem | None = None
 
-    def refresh(self, indent: int) -> None:
+    def refresh(self, indent: int, git: GitInfo | None = None) -> None:
         item = self.item
         if item is None:
             return
@@ -99,7 +106,17 @@ class _Row(Gtk.Box):
             text += "  …"
         self.label.set_text(text)
         self.set_tooltip_text(entry.path)
+        status = git.status_of(entry.path) if git is not None else None
+        ignored = git is not None and git.is_ignored(entry.path)
+        self.marker.set_text(
+            ("•" if entry.is_dir else MARKERS[status]) if status in MARKERS else ""
+        )
+        for known in GIT_STATUSES:
+            self.remove_css_class(f"git-{known}")
+        if status is not None:
+            self.add_css_class(f"git-{status}")
         for css, on in (
+            ("ignored-entry", ignored),
             ("hidden-entry", entry.is_hidden),
             ("error-entry", bool(node.error) or entry.broken),
             ("directory", entry.is_dir),
@@ -159,14 +176,24 @@ class FileTree(Gtk.Box):
         self._closed = False
         self._pending_select: str | None = None
         self._pending_expand: str | None = None
+        self._git: GitInfo | None = None
+        self._git_timer = 0
+        self._git_running = False
+        self._git_again = False
+        self._hide_ignored = config.hide_gitignored
+        self._git_monitor: tuple[Gio.FileMonitor, int] | None = None
+        self._git_monitor_dir: str | None = None
         self._menu_node: Node | None = None
         self._monitors: dict[Node, tuple[Gio.FileMonitor, int]] = {}
         self._refresh_timers: dict[Node, int] = {}
         self._pool = ThreadPoolExecutor(
             max_workers=SCAN_THREADS, thread_name_prefix="paneterm-scan"
         )
+        # Git can be slow in a big repository; its own thread keeps directory scans quick.
+        self._git_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="paneterm-git")
 
         self.model = TreeModel(_Bridge(self), show_hidden=config.show_hidden)
+        self.model.hidden_by = self._is_hidden_by_git
         self._rows = RowModel(self.model)
         self._selection = Gtk.SingleSelection(model=self._rows, autoselect=False, can_unselect=True)
 
@@ -290,7 +317,7 @@ class FileTree(Gtk.Box):
         item: RowItem = list_item.get_item()
         row.item = item
         item.row = row
-        row.refresh(self._config.indent)
+        row.refresh(self._config.indent, self._git)
 
     def _unbind_row(self, _factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
         row: _Row = list_item.get_child()
@@ -358,6 +385,19 @@ class FileTree(Gtk.Box):
         if name == "H":
             self._hidden_button.set_active(not self.model.show_hidden)
             return True
+        if name == "p":
+            self._pin_button.set_active(not self._pin_button.get_active())
+            return True
+        if name in ("minus", "BackSpace"):
+            self.go_up()
+            return True
+        if name == "F5":
+            self.model.refresh_all()
+            self.schedule_git(immediately=True)
+            return True
+        if name == "I":
+            self.set_hide_ignored(not self._hide_ignored)
+            return True
         if node is None:
             return False
         if name in ("Right", "l"):
@@ -423,7 +463,9 @@ class FileTree(Gtk.Box):
     def set_root(self, path: str) -> None:
         if self._closed:
             return
+        self._git = None  # the old root's colors must not flash on the new tree
         self.model.set_root(path)
+        self.schedule_git(immediately=True)
         self._root_label.set_text(os.path.basename(path) or path)
         self._root_label.set_tooltip_text(path)
         parent = os.path.dirname(os.path.normpath(path))
@@ -465,8 +507,17 @@ class FileTree(Gtk.Box):
 
     def apply_config(self, config: SidebarConfig) -> None:
         indent_changed = config.indent != self._config.indent
+        git_changed = (config.git_status, config.hide_gitignored) != (
+            self._config.git_status,
+            self._config.hide_gitignored,
+        )
         self._config = config
-        if indent_changed:
+        if git_changed:
+            self._hide_ignored = config.hide_gitignored
+            self._git = None
+            self.model.refilter()
+            self.schedule_git(immediately=True)
+        elif indent_changed:
             self._rows.changed(0, len(self.model.visible), len(self.model.visible))
 
     # -- scanning and watching (the model's listener, see _Bridge) ------------------------
@@ -559,7 +610,13 @@ class FileTree(Gtk.Box):
         event: Gio.FileMonitorEvent,
         node: Node,
     ) -> None:
-        if event not in _REFRESH_EVENTS or node in self._refresh_timers:
+        if event in _CONTENT_EVENTS:
+            self.schedule_git()  # a saved file changes its git status, not the listing
+            return
+        if event not in _REFRESH_EVENTS:
+            return
+        self.schedule_git()
+        if node in self._refresh_timers:
             return
         self._refresh_timers[node] = GLib.timeout_add(EVENT_DEBOUNCE_MS, self._refresh_now, node)
 
@@ -575,7 +632,7 @@ class FileTree(Gtk.Box):
     def _node_changed(self, node: Node) -> None:
         item = node.ui
         if item is not None and item.row is not None:
-            item.row.refresh(self._config.indent)
+            item.row.refresh(self._config.indent, self._git)
 
     def scroll_to(self, node: Node) -> None:
         self._select_node(node)
@@ -740,6 +797,95 @@ class FileTree(Gtk.Box):
             self._pending_select = None
             self._select_node(node)
 
+    # -- git (FR-29, FR-30) -------------------------------------------------------------
+
+    def _is_hidden_by_git(self, node: Node) -> bool:
+        git = self._git
+        return self._hide_ignored and git is not None and git.is_ignored(node.path)
+
+    def set_hide_ignored(self, hide: bool) -> None:
+        if hide != self._hide_ignored:
+            self._hide_ignored = hide
+            self.model.refilter()
+
+    @property
+    def hide_ignored(self) -> bool:
+        return self._hide_ignored
+
+    def schedule_git(self, *, immediately: bool = False) -> None:
+        if self._closed or not self._config.git_status:
+            return
+        if self._git_timer:
+            GLib.source_remove(self._git_timer)
+        delay = 0 if immediately else GIT_DEBOUNCE_MS
+        self._git_timer = GLib.timeout_add(delay, self._start_git)
+
+    def _start_git(self) -> bool:
+        self._git_timer = 0
+        root = self.root_path
+        if root is None or self._closed:
+            return GLib.SOURCE_REMOVE
+        if self._git_running:
+            self._git_again = True  # one more run once the current one finishes
+            return GLib.SOURCE_REMOVE
+        self._git_running = True
+        future = self._git_pool.submit(load_git_info, root)
+        future.add_done_callback(lambda f: GLib.idle_add(self._git_done, root, f))
+        return GLib.SOURCE_REMOVE
+
+    def _git_done(self, root: str, future: object) -> bool:
+        self._git_running = False
+        if self._closed:
+            return GLib.SOURCE_REMOVE
+        try:
+            info = future.result()  # type: ignore[attr-defined]
+        except Exception:  # a git failure must never disturb the tree
+            log.exception("git status failed")
+            info = None
+        if self.root_path == root:
+            self._apply_git(info)
+        if self._git_again:
+            self._git_again = False
+            self.schedule_git(immediately=True)
+        return GLib.SOURCE_REMOVE
+
+    def _apply_git(self, info: GitInfo | None) -> None:
+        previous = self._git
+        self._git = info
+        self._watch_git_dir(info.root if info else None)
+        if self._hide_ignored and (previous.ignored if previous else set()) != (
+            info.ignored if info else set()
+        ):
+            self.model.refilter()
+        for node in self.model.visible:
+            self._node_changed(node)
+
+    def _watch_git_dir(self, repo_root: str | None) -> None:
+        """Watch ``.git`` so `git add`, `commit` or `checkout` in a shell update the colors."""
+        directory = os.path.join(repo_root, ".git") if repo_root else None
+        if directory == self._git_monitor_dir:
+            return
+        if self._git_monitor is not None:
+            self._git_monitor[0].disconnect(self._git_monitor[1])
+            self._git_monitor[0].cancel()
+            self._git_monitor = None
+        self._git_monitor_dir = directory
+        if directory is None or not os.path.isdir(directory):
+            return
+        try:
+            monitor = Gio.File.new_for_path(directory).monitor_directory(
+                Gio.FileMonitorFlags.NONE, None
+            )
+        except GLib.Error as exc:
+            log.warning("cannot watch %s: %s", directory, exc.message)
+            return
+        handler = monitor.connect("changed", self._git_dir_event)
+        self._git_monitor = (monitor, handler)
+
+    def _git_dir_event(self, _m: Gio.FileMonitor, file: Gio.File, _o: object, _e: object) -> None:
+        if file.get_basename() in GIT_STATE_FILES:
+            self.schedule_git()
+
     # -- lifecycle ----------------------------------------------------------------------
 
     def close(self) -> None:
@@ -752,8 +898,13 @@ class FileTree(Gtk.Box):
         for timer in self._refresh_timers.values():
             GLib.source_remove(timer)
         self._refresh_timers.clear()
+        if self._git_timer:
+            GLib.source_remove(self._git_timer)
+            self._git_timer = 0
+        self._watch_git_dir(None)
         self._menu_popover.unparent()
         self._pool.shutdown(wait=False, cancel_futures=True)
+        self._git_pool.shutdown(wait=False, cancel_futures=True)
 
 
 class _Bridge:
