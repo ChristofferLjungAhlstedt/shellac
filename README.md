@@ -15,7 +15,7 @@ Built milestone by milestone from the development specification.
 | M1 Single terminal window | Done: themed window, VTE running your shell, copy/paste, config loading |
 | M2 Splits and tabs | Done: nested splits, close/collapse, directional focus, resize, pane zoom, tabs, working-directory inheritance |
 | M3 Config and themes | Done: five bundled themes, runtime switching, live config reload, system light/dark following, rebindable keys |
-| M4 File tree sidebar | Not started |
+| M4 File tree sidebar | Done: lazy tree, follow mode and pin, live updates, icons, activation actions, context menu, keyboard navigation, filter |
 | M5 Git integration and polish | Not started |
 | M6 Packaging (`.desktop` file, icon) | Not started |
 
@@ -37,9 +37,11 @@ They are remappable in `[keybindings]`.
 | Copy / paste | Ctrl+Shift+C / Ctrl+Shift+V |
 | Cycle theme (`cycle_theme`) | Ctrl+Shift+P |
 | Reload config (`reload_config`) | Ctrl+Shift+R |
+| Show / hide sidebar (`toggle_sidebar`) | Ctrl+Shift+B |
+| Focus the sidebar (`focus_sidebar`) | Ctrl+Alt+B |
 
-Not yet wired up (later milestones): `toggle_sidebar` and `search`. They are accepted and
-validated in the config, but not bound.
+Not yet wired up (later milestone): `search`. It is accepted and validated in the config,
+but not bound.
 
 If two actions end up with the same accelerator, a warning is logged and shown as a toast.
 
@@ -121,6 +123,18 @@ padding = 8
 cursor_shape = "block"   # block | ibeam | underline
 cursor_blink = false
 
+[sidebar]
+visible = true           # first-launch default; afterwards the remembered state wins
+width = 260              # same
+follow_cwd = true        # the root follows the focused pane's directory
+show_hidden = false      # H toggles it while the tree is focused
+on_file_activate = "editor_split"   # editor_split | paste_path | desktop_open
+on_dir_activate = "cd"              # cd | reroot
+editor = ""              # empty = $VISUAL, then $EDITOR, then nano/vim/vi (may include arguments)
+editor_split_direction = "right"    # right | down
+reveal_in_root = true    # a cd inside the shown tree expands to it instead of re-rooting
+indent = 16              # pixels per tree level
+
 [keybindings]
 copy = "<Ctrl><Shift>c"
 paste = "<Ctrl><Shift>v"
@@ -128,6 +142,30 @@ paste = "<Ctrl><Shift>v"
 
 Keybindings for actions that are not implemented yet (splits, tabs, sidebar, ...) are
 accepted and validated but not bound until their milestone lands.
+
+## File tree sidebar
+
+Ctrl+Shift+B shows or hides it, Ctrl+Alt+B moves keyboard focus into it. Whether it is
+visible and how wide it is are remembered in `~/.local/state/paneterm/state.json`, which
+wins over `[sidebar] visible/width` (those are only the first-launch defaults). Your
+config file is never rewritten.
+
+- **Follow mode** (default): the tree follows the focused pane's directory, debounced
+  by 150 ms. If the directory is inside the tree, it is expanded and scrolled to instead of
+  re-rooting. The pin button locks the root for this window.
+- **Live updates**: every expanded directory is watched; create, delete and rename events
+  update the tree without a reload. Collapsing a directory releases its watchers.
+- **Keys** (tree focused): Up/Down move, Right or `l` expand, Left or `h` collapse (or go
+  to the parent), Enter open, `H` toggle hidden files, `/` filter by name, F2 rename,
+  Delete move to trash, Menu or Shift+F10 context menu, Escape back to the terminal.
+- **Mouse**: a click expands or collapses a directory; a double click activates it. Right
+  click opens the context menu (copy path, copy relative path, reveal in file manager,
+  new file, new folder, rename, move to trash, open in new tab).
+- **Activation**: a directory runs `cd` in the focused pane, a file opens `$EDITOR` in a new
+  split. The `cd` is only typed when the shell is at a prompt; otherwise a toast says what is
+  running. Paths are shell-quoted.
+- **Icons** are bundled symbolic SVGs, so no glyph font is needed. They require the SVG
+  pixbuf loader (`librsvg2-common`), which a desktop install already has.
 
 ## Themes
 
@@ -187,6 +225,16 @@ Where the spec was ambiguous, the simplest behavior was chosen:
 - **Known cosmetic warning.** Closing a pane programmatically in an unfocused window can log
   a GTK `gtk_paned_set_focus_child` warning. It did not appear with real keypresses in a
   focused window, and has no visible effect.
+
+- **Double click on a directory.** The first click already expanded it, so a double click
+  expands and then `cd`s (or re-roots). It does not toggle twice.
+- **Typed text at the prompt.** `cd` is typed after whatever is already on the command line,
+  as the spec's idle check cannot see a half-typed line.
+- **Unreachable root.** If the root directory disappears the tree moves to the nearest
+  directory that still exists. A directory still open in a shell sends no delete event, so
+  this is also checked once a second.
+- **Filter** only applies to directories that are already loaded; it never scans the disk.
+- **Git status and `.gitignore`** (`hide_gitignored`) arrive with M5.
 
 ## Development
 
