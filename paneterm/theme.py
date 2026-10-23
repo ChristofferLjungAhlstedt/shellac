@@ -227,6 +227,23 @@ paned > separator {{
 {_sidebar_css(theme)}{_focus_indicator_css(theme, appearance)}"""
 
 
+# Which palette entry colors each git status. Taken from the theme, so every theme reads well.
+GIT_STATUS_PALETTE_INDEX = {
+    "conflicted": 5,  # magenta
+    "modified": 3,  # yellow
+    "deleted": 1,  # red
+    "added": 2,  # green
+    "untracked": 6,  # cyan
+}
+
+
+def _git_status_css(theme: Theme) -> str:
+    return "\n".join(
+        f".paneterm-sidebar .git-{name} label {{ color: {theme.palette[index]}; }}"
+        for name, index in GIT_STATUS_PALETTE_INDEX.items()
+    )
+
+
 def _sidebar_css(theme: Theme) -> str:
     return f"""
 .paneterm-sidebar {{
@@ -250,8 +267,20 @@ def _sidebar_css(theme: Theme) -> str:
   color: {theme.sidebar_foreground};
 }}
 .paneterm-sidebar .hidden-entry {{ opacity: 0.6; }}
+.paneterm-sidebar .ignored-entry {{ opacity: 0.45; }}
+.paneterm-sidebar .git-marker {{ font-size: 0.85em; font-weight: bold; }}
+{_git_status_css(theme)}
 .paneterm-sidebar .error-entry label {{ font-style: italic; opacity: 0.7; }}
 .paneterm-sidebar-header {{ padding: 4px 6px; }}
+.paneterm-search {{
+  background-color: {theme.sidebar_background};
+  color: {theme.sidebar_foreground};
+  border: 1px solid {theme.divider};
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}}
+.paneterm-search entry, .paneterm-search button {{ color: {theme.sidebar_foreground}; }}
 .paneterm-sidebar button, .paneterm-sidebar entry, .paneterm-sidebar image {{
   color: {theme.sidebar_foreground};
 }}

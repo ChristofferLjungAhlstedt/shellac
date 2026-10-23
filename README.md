@@ -16,7 +16,7 @@ Built milestone by milestone from the development specification.
 | M2 Splits and tabs | Done: nested splits, close/collapse, directional focus, resize, pane zoom, tabs, working-directory inheritance |
 | M3 Config and themes | Done: five bundled themes, runtime switching, live config reload, system light/dark following, rebindable keys |
 | M4 File tree sidebar | Done: lazy tree, follow mode and pin, live updates, icons, activation actions, context menu, keyboard navigation, filter |
-| M5 Git integration and polish | Not started |
+| M5 Git integration and polish | Done: git status colors, `.gitignore` dimming/hiding, scrollback search, clickable URLs, font zoom, remembered window size |
 | M6 Packaging (`.desktop` file, icon) | Not started |
 
 ## Keybindings
@@ -37,11 +37,12 @@ They are remappable in `[keybindings]`.
 | Copy / paste | Ctrl+Shift+C / Ctrl+Shift+V |
 | Cycle theme (`cycle_theme`) | Ctrl+Shift+P |
 | Reload config (`reload_config`) | Ctrl+Shift+R |
+| Search the scrollback (`search`) | Ctrl+Shift+F |
+| Font zoom in / out / reset (`zoom_in/out/reset`) | Ctrl+plus / Ctrl+minus / Ctrl+0 |
 | Show / hide sidebar (`toggle_sidebar`) | Ctrl+Shift+B |
 | Focus the sidebar (`focus_sidebar`) | Ctrl+Alt+B |
 
-Not yet wired up (later milestone): `search`. It is accepted and validated in the config,
-but not bound.
+Ctrl+= and the keypad's + / - / 0 also zoom. Ctrl+click opens a URL in the output.
 
 If two actions end up with the same accelerator, a warning is logged and shown as a toast.
 
@@ -100,6 +101,9 @@ same file name. `paneterm --help` lists the command-line flags.
 shell = ""               # empty = $SHELL, then /bin/zsh, then /bin/bash
 login_shell = true       # start the shell with -l
 scrollback_lines = 10000
+clickable_urls = true    # Ctrl+click opens URLs
+search_case_sensitive = false
+search_wrap_around = true
 
 [window]
 width = 1000
@@ -122,12 +126,16 @@ opacity = 0.95           # terminal background only, never the text
 padding = 8
 cursor_shape = "block"   # block | ibeam | underline
 cursor_blink = false
+zoom_scope = "pane"      # pane | window: what Ctrl+plus / Ctrl+minus resize
+zoom_step = 0.1
 
 [sidebar]
 visible = true           # first-launch default; afterwards the remembered state wins
 width = 260              # same
 follow_cwd = true        # the root follows the focused pane's directory
 show_hidden = false      # H toggles it while the tree is focused
+hide_gitignored = false  # true hides ignored entries; false dims them (I toggles)
+git_status = true        # color and mark changed files (needs git)
 on_file_activate = "editor_split"   # editor_split | paste_path | desktop_open
 on_dir_activate = "cd"              # cd | reroot
 editor = ""              # empty = $VISUAL, then $EDITOR, then nano/vim/vi (may include arguments)
@@ -164,6 +172,14 @@ config file is never rewritten.
 - **Activation**: a directory runs `cd` in the focused pane, a file opens `$EDITOR` in a new
   split. The `cd` is only typed when the shell is at a prompt; otherwise a toast says what is
   running. Paths are shell-quoted.
+- **Git** (inside a repository): changed files are colored and marked (`M` modified,
+  `A` added, `?` untracked, `D` deleted, `!` conflicted); a directory shows `•` and the most
+  important status of anything below it. Ignored entries are dimmed, or hidden with
+  `hide_gitignored` (`I` toggles it for the session). Colors come from the theme's palette.
+  `git` runs on its own thread with `GIT_OPTIONAL_LOCKS=0`, so it never blocks the window or
+  takes the index lock, and it re-runs about 300 ms after files change, are saved, or after
+  `git add` / `commit` / `checkout` in a shell. More keys: `p` pin, `-` or Backspace go to
+  the parent, F5 refresh.
 - **Icons** are bundled symbolic SVGs, so no glyph font is needed. They require the SVG
   pixbuf loader (`librsvg2-common`), which a desktop install already has.
 
@@ -235,6 +251,17 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   this is also checked once a second.
 - **Filter** only applies to directories that are already loaded; it never scans the disk.
 - **Git status and `.gitignore`** (`hide_gitignored`) arrive with M5.
+
+- **Window size.** The size and maximized state are remembered in the state file and win over
+  `[window] width/height`, which only set the first-launch size.
+- **Search** uses VTE's own search: the match is highlighted and selected in the terminal.
+  Enter / Shift+Enter go to the next / previous match, Escape closes the bar. The text is
+  matched literally, not as a regular expression.
+- **URL clicking** only opens `http`, `https`, `ftp(s)`, `file` and `mailto`, also for OSC 8
+  hyperlinks, so a program cannot make Ctrl+click launch an arbitrary protocol handler.
+  A trailing `.` `,` `)` is not treated as part of the link, so a URL that itself ends in
+  `)` loses it.
+- **Font zoom** is per pane by default; `zoom_scope = "window"` zooms every pane and new ones.
 
 ## Development
 
