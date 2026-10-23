@@ -56,3 +56,14 @@ def test_save_leaves_no_temporary_file_behind(tmp_path: Path):
     path = tmp_path / "state.json"
     save_state(UiState(sidebar_width=250), path)
     assert [p.name for p in tmp_path.iterdir()] == ["state.json"]
+
+
+def test_window_state_round_trip_and_validation(tmp_path: Path):
+    path = tmp_path / "state.json"
+    state = UiState(window_width=1200, window_height=700, window_maximized=False)
+    assert save_state(state, path)
+    assert load_state(path) == state
+    path.write_text(json.dumps({"window": {"width": 50, "height": "tall", "maximized": 1}}))
+    assert load_state(path) == UiState()
+    path.write_text(json.dumps({"window": 3, "sidebar": {"visible": True}}))
+    assert load_state(path) == UiState(sidebar_visible=True)
