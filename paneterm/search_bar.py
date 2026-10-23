@@ -42,12 +42,14 @@ class SearchBar(Gtk.Box):
         self._entry.add_controller(keys)
         self.append(self._entry)
 
-        self._previous = self._button("go-up-symbolic", "Previous match (Shift+Enter)", False)
-        self._next = self._button("go-down-symbolic", "Next match (Enter)", True)
+        self._previous = self._button(
+            "paneterm-chevron-up-symbolic", "Previous match (Shift+Enter)", False
+        )
+        self._next = self._button("paneterm-chevron-down-symbolic", "Next match (Enter)", True)
         self._case = Gtk.ToggleButton(label="Aa", tooltip_text="Match case", active=case_sensitive)
         self._case.add_css_class("flat")
         self._case.connect("toggled", lambda _b: self._update(first=False))
-        close = Gtk.Button(icon_name="window-close-symbolic", tooltip_text="Close (Escape)")
+        close = Gtk.Button(icon_name="paneterm-close-symbolic", tooltip_text="Close (Escape)")
         close.add_css_class("flat")
         close.connect("clicked", lambda _b: self.close())
         for widget in (self._previous, self._next, self._case, close):
