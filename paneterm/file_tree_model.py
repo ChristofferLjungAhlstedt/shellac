@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import bisect
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -158,6 +159,8 @@ class TreeModel:
         self.listener = listener
         self.show_hidden = show_hidden
         self.filter_text = ""
+        # Optional extra rule that hides a node (the sidebar uses it for ignored files).
+        self.hidden_by: Callable[[Node], bool] | None = None
         self.root: Node | None = None
         self.visible: list[Node] = []
         self._watched: set[Node] = set()
@@ -429,8 +432,14 @@ class TreeModel:
             self.filter_text = text
             self._rebuild()
 
+    def refilter(self) -> None:
+        """Re-evaluate which rows are shown after ``hidden_by`` would answer differently."""
+        self._rebuild()
+
     def _shown(self, node: Node) -> bool:
-        return self.show_hidden or not node.entry.is_hidden
+        if not (self.show_hidden or not node.entry.is_hidden):
+            return False
+        return self.hidden_by is None or not self.hidden_by(node)
 
     def _matches(self, node: Node) -> bool:
         return self.filter_text.casefold() in node.entry.name.casefold()
