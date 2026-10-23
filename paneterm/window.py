@@ -14,6 +14,7 @@ from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_NAME  # noqa: E402
 from .config import Config  # noqa: E402
+from .file_actions import Problem, plan_file_action  # noqa: E402
 from .file_tree import FileTree, register_icons  # noqa: E402
 from .file_tree_model import Node  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
@@ -21,7 +22,7 @@ from .pane_tree import Axis, Direction  # noqa: E402
 from .search_bar import SearchBar  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
 from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
-from .terminal_actions import cd_command, editor_argv, path_text  # noqa: E402
+from .terminal_actions import cd_command, path_text  # noqa: E402
 from .theme import Theme  # noqa: E402
 
 MAX_TAB_SHORTCUTS = 9
@@ -55,6 +56,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._state_timer = 0
         self._last_followed: str | None = None
         self._font_scale = 1.0
+        self._status_toast: Adw.Toast | None = None
 
         register_icons()
         self._state = saved
@@ -72,7 +74,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._tab_bar.set_view(self._tab_view)
         self._tab_bar.set_autohide(config.tabs.autohide)
 
-        new_tab_button = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="New tab")
+        new_tab_button = Gtk.Button(icon_name="paneterm-plus-symbolic", tooltip_text="New tab")
         new_tab_button.set_action_name("win.new_tab")
         sidebar_button = Gtk.Button(
             icon_name="paneterm-sidebar-symbolic", tooltip_text="Toggle sidebar"
@@ -159,8 +161,11 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- tabs ---------------------------------------------------------------------------
 
-    def new_tab(self, cwd: str | None = None) -> PaneContainer:
-        """Open a tab in the focused pane's directory, or in ``cwd`` (FR-22)."""
+    def new_tab(self, cwd: str | None = None, argv: list[str] | None = None) -> PaneContainer:
+        """Open a tab in the focused pane's directory, or in ``cwd`` (FR-22).
+
+        ``argv`` runs that command in the tab instead of a shell.
+        """
         current = self._current_container()
         if cwd is None and current is not None and current.focused_pane is not None:
             cwd = current.focused_pane.current_directory()
@@ -169,6 +174,7 @@ class MainWindow(Adw.ApplicationWindow):
             self._config,
             self._theme,
             cwd=resolve_working_directory(cwd) if cwd else None,
+            argv=argv,
             on_empty=self._on_container_empty,
             on_title_changed=self._on_container_title_changed,
         )
@@ -431,20 +437,21 @@ class MainWindow(Adw.ApplicationWindow):
         pane.send_text(cd_command(path))
 
     def _activate_file(self, path: str) -> None:
-        mode = self._config.sidebar.on_file_activate
-        if mode == "paste_path":
+        plan = plan_file_action(path, self._config.sidebar)
+        if isinstance(plan, Problem):
+            self.show_toast(plan.message)
+            return
+        if plan.placement == "paste":
             pane = self._focused_pane()
             if pane is not None:
-                pane.terminal.paste_text(path_text(path))
+                pane.paste_text(path_text(path))
                 pane.grab_focus()
-        elif mode == "desktop_open":
+        elif plan.placement == "desktop":
             launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(path))
             launcher.launch(self, None, self._launch_finished, launcher)
+        elif plan.placement == "tab":
+            self.new_tab(cwd=os.path.dirname(path), argv=plan.argv)
         else:
-            argv = editor_argv(path, self._config.sidebar.editor)
-            if argv is None:
-                self.show_toast("No editor found. Set [sidebar] editor or $EDITOR")
-                return
             container = self._current_container()
             if container is None:
                 return
@@ -453,7 +460,7 @@ class MainWindow(Adw.ApplicationWindow):
                 if self._config.sidebar.editor_split_direction == "down"
                 else Axis.HORIZONTAL
             )
-            container.split(axis, argv=argv, cwd=os.path.dirname(path))
+            container.split(axis, argv=plan.argv, cwd=os.path.dirname(path))
 
     def _launch_finished(
         self, launcher: Gtk.FileLauncher, result: Gio.AsyncResult, _l: object
@@ -463,8 +470,20 @@ class MainWindow(Adw.ApplicationWindow):
         except GLib.Error as exc:
             self.show_toast(f"Cannot open file: {exc.message}")
 
-    def show_toast(self, message: str) -> None:
-        self._toasts.add_toast(Adw.Toast.new(message))
+    def show_toast(self, message: str, *, replace_previous: bool = False) -> None:
+        """Show a toast. ``replace_previous`` first removes the last one shown this way, so a
+        quick series (switching themes) shows the newest message, not a queue of old ones."""
+        toast = Adw.Toast.new(message)
+        if replace_previous:
+            if self._status_toast is not None:
+                self._status_toast.dismiss()
+            self._status_toast = toast
+            toast.connect("dismissed", self._status_toast_dismissed)
+        self._toasts.add_toast(toast)
+
+    def _status_toast_dismissed(self, toast: Adw.Toast) -> None:
+        if self._status_toast is toast:
+            self._status_toast = None
 
     # -- lifecycle ----------------------------------------------------------------------
 
