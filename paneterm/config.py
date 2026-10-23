@@ -68,10 +68,21 @@ class SidebarConfig:
     width: int = 260
     follow_cwd: bool = True
     show_hidden: bool = False
+    # Dotfiles shown even while hidden files are hidden.
+    always_show: list[str] = field(
+        default_factory=lambda: [".gitignore", ".gitattributes", ".gitmodules", ".editorconfig"]
+    )
     hide_gitignored: bool = False  # hide ignored entries instead of dimming them
     git_status: bool = True  # color and mark changed files; needs git installed
-    on_file_activate: str = "editor_split"  # editor_split | paste_path | desktop_open
+    # editor_split | editor_tab | command_split | command_tab | run | paste_path | desktop_open
+    on_file_activate: str = "editor_split"
+    file_command: str = ""  # for command_*: e.g. "bat --paging=always {path}"
+    # Per-extension (or exact file name) command, used by editor_* and command_* modes:
+    # open_with = { md = "glow -p {path}", py = "python {path}" }
+    open_with: dict[str, str] = field(default_factory=dict)
+    keep_pane_open: bool = True  # command_* and run: wait for Enter after the command ends
     on_dir_activate: str = "cd"  # cd | reroot
+    file_type_icons: bool = True  # logos per language (JS, Dart, ...); false: generic icons
     indent: int = 16  # pixels of indentation per tree level
     editor: str = ""  # empty = $VISUAL, then $EDITOR, then nano/vim/vi
     editor_split_direction: str = "right"  # right | down
@@ -102,7 +113,17 @@ ENUMS: dict[tuple[str, str], frozenset[str]] = {
     ("appearance", "focus_indicator"): frozenset({"border", "dim", "none"}),
     ("appearance", "cursor_shape"): frozenset({"block", "ibeam", "underline"}),
     ("appearance", "zoom_scope"): frozenset({"pane", "window"}),
-    ("sidebar", "on_file_activate"): frozenset({"editor_split", "paste_path", "desktop_open"}),
+    ("sidebar", "on_file_activate"): frozenset(
+        {
+            "editor_split",
+            "editor_tab",
+            "command_split",
+            "command_tab",
+            "run",
+            "paste_path",
+            "desktop_open",
+        }
+    ),
     ("sidebar", "on_dir_activate"): frozenset({"cd", "reroot"}),
     ("sidebar", "editor_split_direction"): frozenset({"right", "down"}),
 }
@@ -156,6 +177,12 @@ def _type_matches(value: Any, default: Any) -> bool:
         return isinstance(value, int | float) and not isinstance(value, bool)
     if isinstance(default, str):
         return isinstance(value, str)
+    if isinstance(default, list):
+        return isinstance(value, list) and all(isinstance(item, str) for item in value)
+    if isinstance(default, dict):
+        return isinstance(value, dict) and all(
+            isinstance(key, str) and isinstance(item, str) for key, item in value.items()
+        )
     return False
 
 
@@ -198,7 +225,11 @@ def _build_section(name: str, cls: type, raw: Any, warnings: list[str]) -> Any:
             )
             continue
         # Keep floats as floats even if the user wrote an integer (font_size = 12).
-        setattr(instance, f.name, float(value) if isinstance(default, float) else value)
+        if isinstance(default, float):
+            value = float(value)
+        elif isinstance(value, list | dict):
+            value = value.copy()  # never share the parsed TOML's own containers
+        setattr(instance, f.name, value)
     return instance
 
 
