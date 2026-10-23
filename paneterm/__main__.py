@@ -21,6 +21,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="print the zsh snippet that reports the working directory (OSC 7) and exit",
     )
+    parser.add_argument(
+        "--install-desktop",
+        action="store_true",
+        help="add paneterm to the application menu (launcher and icon, for this user) and exit",
+    )
+    parser.add_argument(
+        "--uninstall-desktop",
+        action="store_true",
+        help="remove what --install-desktop added and exit",
+    )
     parser.add_argument("--debug", action="store_true", help="enable debug logging")
     return parser
 
@@ -32,6 +42,17 @@ def main(argv: list[str] | None = None) -> int:
         from .shell_integration import ZSH_SNIPPET
 
         sys.stdout.write(ZSH_SNIPPET)
+        return 0
+
+    if args.install_desktop or args.uninstall_desktop:
+        from . import desktop
+
+        done = desktop.uninstall() if args.uninstall_desktop else desktop.install()
+        verb = "Removed" if args.uninstall_desktop else "Installed"
+        for path in done:
+            sys.stdout.write(f"{verb} {path}\n")
+        if not done:
+            sys.stdout.write("Nothing to remove.\n")
         return 0
 
     logging.basicConfig(
