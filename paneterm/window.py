@@ -391,6 +391,7 @@ class MainWindow(Adw.ApplicationWindow):
         if cwd == self._last_followed and self._sidebar.root_path is not None:
             return GLib.SOURCE_REMOVE
         self._last_followed = cwd
+        self._sidebar.set_git_hint(cwd)
         root = self._sidebar.root_path
         if (
             root
