@@ -177,6 +177,7 @@ class FileTree(Gtk.Box):
         self._pending_select: str | None = None
         self._pending_expand: str | None = None
         self._git: GitInfo | None = None
+        self._git_hint: str | None = None
         self._git_timer = 0
         self._git_running = False
         self._git_again = False
@@ -820,6 +821,15 @@ class FileTree(Gtk.Box):
         delay = 0 if immediately else GIT_DEBOUNCE_MS
         self._git_timer = GLib.timeout_add(delay, self._start_git)
 
+    def set_git_hint(self, directory: str | None) -> None:
+        """A directory (the focused pane's) to look for a repository in when the root has none.
+
+        The root is often a parent such as the home folder, with the repositories below it.
+        """
+        if directory != self._git_hint:
+            self._git_hint = directory
+            self.schedule_git()
+
     def _start_git(self) -> bool:
         self._git_timer = 0
         root = self.root_path
@@ -829,7 +839,7 @@ class FileTree(Gtk.Box):
             self._git_again = True  # one more run once the current one finishes
             return GLib.SOURCE_REMOVE
         self._git_running = True
-        future = self._git_pool.submit(load_git_info, root)
+        future = self._git_pool.submit(_load_git_for, root, self._git_hint)
         future.add_done_callback(lambda f: GLib.idle_add(self._git_done, root, f))
         return GLib.SOURCE_REMOVE
 
@@ -905,6 +915,13 @@ class FileTree(Gtk.Box):
         self._menu_popover.unparent()
         self._pool.shutdown(wait=False, cancel_futures=True)
         self._git_pool.shutdown(wait=False, cancel_futures=True)
+
+
+def _load_git_for(root: str, hint: str | None) -> GitInfo | None:
+    info = load_git_info(root)
+    if info is None and hint and hint.startswith(root.rstrip(os.sep) + os.sep):
+        info = load_git_info(hint)
+    return info
 
 
 class _Bridge:
