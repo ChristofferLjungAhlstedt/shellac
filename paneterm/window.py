@@ -18,8 +18,9 @@ from .file_tree import FileTree, register_icons  # noqa: E402
 from .file_tree_model import Node  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
+from .search_bar import SearchBar  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
-from .state import MAX_WIDTH, MIN_WIDTH, UiState, load_state, save_state  # noqa: E402
+from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
 from .terminal_actions import cd_command, editor_argv, path_text  # noqa: E402
 from .theme import Theme  # noqa: E402
 
@@ -37,12 +38,15 @@ class MainWindow(Adw.ApplicationWindow):
         theme: Theme,
         warnings: list[str] | None = None,
     ) -> None:
+        saved = load_state()  # remembered size wins over the config's first-launch default
         super().__init__(
             application=app,
             title=APP_NAME,
-            default_width=config.window.width,
-            default_height=config.window.height,
+            default_width=saved.window_width or config.window.width,
+            default_height=saved.window_height or config.window.height,
         )
+        if saved.window_maximized:
+            self.maximize()
         self.add_css_class("paneterm")
         self._config = config
         self._theme = theme
@@ -50,9 +54,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._follow_timer = 0
         self._state_timer = 0
         self._last_followed: str | None = None
+        self._font_scale = 1.0
 
         register_icons()
-        self._state = load_state()
+        self._state = saved
         visible = self._state.sidebar_visible
         self._sidebar_visible = config.sidebar.visible if visible is None else visible
         self._sidebar_width = self._state.sidebar_width or config.sidebar.width
@@ -95,7 +100,21 @@ class MainWindow(Adw.ApplicationWindow):
         right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         right.append(self._tab_bar)
         self._toasts.set_vexpand(True)
-        right.append(self._toasts)
+        self._search = SearchBar(
+            case_sensitive=config.general.search_case_sensitive,
+            wrap_around=config.general.search_wrap_around,
+            on_close=lambda: None,
+        )
+        self._search.set_visible(False)
+        self._search.set_halign(Gtk.Align.END)
+        self._search.set_valign(Gtk.Align.START)
+        self._search.set_margin_top(8)
+        self._search.set_margin_end(16)
+        overlay = Gtk.Overlay()
+        overlay.set_vexpand(True)
+        overlay.set_child(self._toasts)
+        overlay.add_overlay(self._search)
+        right.append(overlay)
 
         self._paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
         self._paned.set_start_child(self._sidebar)
@@ -231,6 +250,10 @@ class MainWindow(Adw.ApplicationWindow):
 
             return run
 
+        self._add_action("search", self.open_search)
+        self._add_action("zoom_in", lambda: self._zoom(+1))
+        self._add_action("zoom_out", lambda: self._zoom(-1))
+        self._add_action("zoom_reset", lambda: self._zoom(0))
         self._add_action("toggle_sidebar", self.toggle_sidebar)
         self._add_action("focus_sidebar", self.focus_sidebar)
         self._add_action("copy", on_pane("copy"))
@@ -262,6 +285,29 @@ class MainWindow(Adw.ApplicationWindow):
         action = Gio.SimpleAction.new(name, None)
         action.connect("activate", lambda *_: callback())
         self.add_action(action)
+
+    # -- search and zoom (FR-7, FR-8) ------------------------------------------------------
+
+    def open_search(self) -> None:
+        pane = self._focused_pane()
+        if pane is not None:
+            self._search.open(pane.terminal)
+
+    def _zoom(self, direction: int) -> None:
+        """Zoom in (+1), out (-1) or reset (0), on the focused pane or the whole window."""
+        step = self._config.appearance.zoom_step
+        window_wide = self._config.appearance.zoom_scope == "window"
+        pane = self._focused_pane()
+        if pane is None:
+            return
+        base = self._font_scale if window_wide else pane.font_scale
+        scale = 1.0 if direction == 0 else base + direction * step
+        if window_wide:
+            self._font_scale = scale
+            for container in self._containers.values():
+                container.set_font_scale(scale)
+        else:
+            pane.set_font_scale(scale)
 
     # -- sidebar ------------------------------------------------------------------------
 
@@ -300,9 +346,15 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _save_state(self) -> bool:
         self._state_timer = 0
-        save_state(
-            UiState(sidebar_visible=self._sidebar_visible, sidebar_width=self._sidebar_width)
-        )
+        state = self._state
+        state.sidebar_visible = self._sidebar_visible
+        state.sidebar_width = self._sidebar_width
+        state.window_maximized = self.is_maximized()
+        if not self.is_maximized() and not self.is_fullscreen():
+            width, height = self.get_width(), self.get_height()
+            if width > 0 and height > 0:
+                state.window_width, state.window_height = width, height
+        save_state(state)
         return GLib.SOURCE_REMOVE
 
     def _on_pin_changed(self, pinned: bool) -> None:
@@ -422,7 +474,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._follow_timer = self._poll_id = 0
         if self._state_timer:
             GLib.source_remove(self._state_timer)
-            self._save_state()
+        self._save_state()  # also remembers the window size
         self._sidebar.close()
         # End every shell so nothing is left running after the window closes (M2 acceptance).
         for container in list(self._containers.values()):
