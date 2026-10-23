@@ -52,6 +52,7 @@ class PaneContainer:
         theme: Theme,
         *,
         cwd: str | None = None,
+        argv: list[str] | None = None,
         on_empty: Callable[[PaneContainer], None] | None = None,
         on_title_changed: Callable[[PaneContainer, str], None] | None = None,
     ) -> None:
@@ -67,7 +68,7 @@ class PaneContainer:
 
         self.widget = Adw.Bin()
 
-        pane = self._create_pane(cwd)
+        pane = self._create_pane(cwd, argv)
         self.tree = PaneTree(pane)
         assert isinstance(self.tree.root, Leaf)
         self._leaf_for_pane[pane] = self.tree.root
