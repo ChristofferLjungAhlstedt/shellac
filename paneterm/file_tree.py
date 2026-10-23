@@ -81,7 +81,14 @@ class _Row(Gtk.Box):
             self.append(child)
         self.item: RowItem | None = None
 
-    def refresh(self, indent: int, git: GitInfo | None = None) -> None:
+    def refresh(
+        self,
+        indent: int,
+        git: GitInfo | None = None,
+        *,
+        logos: bool = True,
+        always_shown: frozenset[str] = frozenset(),
+    ) -> None:
         item = self.item
         if item is None:
             return
@@ -98,7 +105,7 @@ class _Row(Gtk.Box):
         else:
             self.arrow.set_from_icon_name("paneterm-chevron-right-symbolic")
             self.arrow.set_opacity(0.0)
-        self.icon.set_from_icon_name(icon_name(entry, expanded=node.expanded))
+        self.icon.set_from_icon_name(icon_name(entry, expanded=node.expanded, logos=logos))
         text = entry.name
         if node.error:
             text += f"  ({node.error})"
@@ -117,7 +124,7 @@ class _Row(Gtk.Box):
             self.add_css_class(f"git-{status}")
         for css, on in (
             ("ignored-entry", ignored),
-            ("hidden-entry", entry.is_hidden),
+            ("hidden-entry", entry.is_hidden and entry.name not in always_shown),
             ("error-entry", bool(node.error) or entry.broken),
             ("directory", entry.is_dir),
         ):
@@ -195,6 +202,7 @@ class FileTree(Gtk.Box):
 
         self.model = TreeModel(_Bridge(self), show_hidden=config.show_hidden)
         self.model.hidden_by = self._is_hidden_by_git
+        self.model.always_shown = frozenset(config.always_show)
         self._rows = RowModel(self.model)
         self._selection = Gtk.SingleSelection(model=self._rows, autoselect=False, can_unselect=True)
 
@@ -318,7 +326,12 @@ class FileTree(Gtk.Box):
         item: RowItem = list_item.get_item()
         row.item = item
         item.row = row
-        row.refresh(self._config.indent, self._git)
+        row.refresh(
+            self._config.indent,
+            self._git,
+            logos=self._config.file_type_icons,
+            always_shown=self.model.always_shown,
+        )
 
     def _unbind_row(self, _factory: Gtk.SignalListItemFactory, list_item: Gtk.ListItem) -> None:
         row: _Row = list_item.get_child()
@@ -512,13 +525,18 @@ class FileTree(Gtk.Box):
             self._config.git_status,
             self._config.hide_gitignored,
         )
+        old_logos = self._config.file_type_icons
+        always_changed = config.always_show != self._config.always_show
         self._config = config
+        if always_changed:
+            self.model.always_shown = frozenset(config.always_show)
+            self.model.refilter()
         if git_changed:
             self._hide_ignored = config.hide_gitignored
             self._git = None
             self.model.refilter()
             self.schedule_git(immediately=True)
-        elif indent_changed:
+        elif indent_changed or config.file_type_icons != old_logos:
             self._rows.changed(0, len(self.model.visible), len(self.model.visible))
 
     # -- scanning and watching (the model's listener, see _Bridge) ------------------------
@@ -633,7 +651,12 @@ class FileTree(Gtk.Box):
     def _node_changed(self, node: Node) -> None:
         item = node.ui
         if item is not None and item.row is not None:
-            item.row.refresh(self._config.indent, self._git)
+            item.row.refresh(
+                self._config.indent,
+                self._git,
+                logos=self._config.file_type_icons,
+                always_shown=self.model.always_shown,
+            )
 
     def scroll_to(self, node: Node) -> None:
         self._select_node(node)

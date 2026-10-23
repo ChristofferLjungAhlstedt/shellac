@@ -159,6 +159,9 @@ class TreeModel:
         self.listener = listener
         self.show_hidden = show_hidden
         self.filter_text = ""
+        # Dotfile names shown even while hidden files are hidden (``.gitignore`` is a project
+        # file, not clutter).
+        self.always_shown: frozenset[str] = frozenset()
         # Optional extra rule that hides a node (the sidebar uses it for ignored files).
         self.hidden_by: Callable[[Node], bool] | None = None
         self.root: Node | None = None
@@ -437,7 +440,8 @@ class TreeModel:
         self._rebuild()
 
     def _shown(self, node: Node) -> bool:
-        if not (self.show_hidden or not node.entry.is_hidden):
+        entry = node.entry
+        if not (self.show_hidden or not entry.is_hidden or entry.name in self.always_shown):
             return False
         return self.hidden_by is None or not self.hidden_by(node)
 
