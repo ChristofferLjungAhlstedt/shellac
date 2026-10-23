@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 
 from .file_tree_model import Entry
+from .file_type_icons import logo_name
 
 ICON_PREFIX = "paneterm-"
 
@@ -108,7 +109,7 @@ def file_kind(name: str) -> str:
     return "file"
 
 
-def icon_name(entry: Entry, *, expanded: bool = False) -> str:
+def icon_name(entry: Entry, *, expanded: bool = False, logos: bool = False) -> str:
     """Icon name for a row (without the ``-symbolic`` suffix handling: it is included)."""
     if entry.broken:
         kind = "broken"
@@ -117,6 +118,9 @@ def icon_name(entry: Entry, *, expanded: bool = False) -> str:
     elif entry.is_symlink:
         kind = "link"
     else:
+        logo = logo_name(entry.name) if logos else None
+        if logo is not None:
+            return logo
         kind = file_kind(entry.name)
     return f"{ICON_PREFIX}{kind}-symbolic"
 
@@ -139,5 +143,8 @@ ALL_ICON_NAMES = tuple(
         "up",
         "eye",
         "sidebar",
+        "plus",
+        "close",
+        "chevron-up",
     )
 )
