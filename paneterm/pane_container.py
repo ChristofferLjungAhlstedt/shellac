@@ -56,6 +56,7 @@ class PaneContainer:
         on_title_changed: Callable[[PaneContainer, str], None] | None = None,
     ) -> None:
         self._config = config
+        self.new_pane_scale = 1.0  # font scale for panes created from now on
         self._theme = theme
         self._on_empty = on_empty
         self._on_title_changed = on_title_changed
@@ -204,6 +205,12 @@ class PaneContainer:
         self._sync_zoom()
         self._update_style()
 
+    def set_font_scale(self, scale: float) -> None:
+        """Window-wide zoom: every pane now, and every pane created later."""
+        self.new_pane_scale = scale
+        for pane in self.panes():
+            pane.set_font_scale(scale)
+
     def apply_style(self, config: Config, theme: Theme) -> None:
         self._config = config
         self._theme = theme
@@ -228,7 +235,7 @@ class PaneContainer:
     # -- pane callbacks -----------------------------------------------------------------
 
     def _create_pane(self, cwd: str | None, argv: list[str] | None = None) -> TerminalPane:
-        return TerminalPane(
+        pane = TerminalPane(
             self._config,
             self._theme,
             cwd=cwd,
@@ -237,6 +244,9 @@ class PaneContainer:
             on_title_changed=self._pane_title_changed,
             on_focus=self._pane_focused,
         )
+        if self.new_pane_scale != 1.0:
+            pane.set_font_scale(self.new_pane_scale)
+        return pane
 
     def _pane_exited(self, pane: TerminalPane, _status: int) -> None:
         # FR-3. Deferred: we are inside VTE's signal emission and are about to destroy it.
