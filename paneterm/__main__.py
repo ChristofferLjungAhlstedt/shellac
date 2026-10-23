@@ -35,6 +35,26 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+_DARK_THEME_WARNING = "gtk-application-prefer-dark-theme"
+
+
+def _quiet_known_warnings() -> None:
+    """Drop one libadwaita warning that is not about paneterm.
+
+    KDE's GTK settings sync writes ``gtk-application-prefer-dark-theme`` into
+    ``~/.config/gtk-4.0/settings.ini``; libadwaita then warns about it on every start. Color
+    scheme handling here goes through ``AdwStyleManager`` already, so the setting does nothing.
+    """
+    from gi.repository import GLib
+
+    def handler(domain: str | None, level: GLib.LogLevelFlags, message: str, _data: object) -> None:
+        if _DARK_THEME_WARNING in message:
+            return
+        GLib.log_default_handler(domain, level, message, None)
+
+    GLib.log_set_handler("Adwaita", GLib.LogLevelFlags.LEVEL_WARNING, handler, None)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
@@ -62,6 +82,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Imported here so --version and --print-shell-integration work without GTK.
     from .application import Application
+
+    _quiet_known_warnings()
 
     app = Application(config_file=args.config)
     # Hand GTK only the program name: our own flags are already parsed above.
