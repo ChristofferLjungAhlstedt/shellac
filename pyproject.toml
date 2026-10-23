@@ -24,7 +24,7 @@ paneterm = "paneterm.__main__:main"
 include = ["paneterm*"]
 
 [tool.setuptools.package-data]
-paneterm = ["resources/themes/*.toml", "resources/icons/hicolor/index.theme", "resources/icons/hicolor/scalable/actions/*.svg"]
+paneterm = ["resources/themes/*.toml", "resources/icons/hicolor/index.theme", "resources/icons/hicolor/scalable/actions/*.svg", "resources/icons/hicolor/scalable/apps/*.svg"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
