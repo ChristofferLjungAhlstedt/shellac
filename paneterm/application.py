@@ -223,7 +223,7 @@ class Application(Adw.Application):
                 message += " (see the log for the rest)"
         window = self.props.active_window
         if isinstance(window, MainWindow):
-            window.show_toast(message)
+            window.show_toast(message, replace_previous=True)
 
     # -- accelerators -------------------------------------------------------------------
 
