@@ -66,6 +66,11 @@ class SidebarConfig:
     hide_gitignored: bool = False
     on_file_activate: str = "editor_split"  # editor_split | paste_path | desktop_open
     on_dir_activate: str = "cd"  # cd | reroot
+    indent: int = 16  # pixels of indentation per tree level
+    editor: str = ""  # empty = $VISUAL, then $EDITOR, then nano/vim/vi
+    editor_split_direction: str = "right"  # right | down
+    reveal_in_root: bool = True  # follow mode scrolls to a directory inside the tree
+    # instead of re-rooting the tree on it (section 8.4)
 
 
 @dataclass
@@ -92,6 +97,7 @@ ENUMS: dict[tuple[str, str], frozenset[str]] = {
     ("appearance", "cursor_shape"): frozenset({"block", "ibeam", "underline"}),
     ("sidebar", "on_file_activate"): frozenset({"editor_split", "paste_path", "desktop_open"}),
     ("sidebar", "on_dir_activate"): frozenset({"cd", "reroot"}),
+    ("sidebar", "editor_split_direction"): frozenset({"right", "down"}),
 }
 
 # Inclusive numeric ranges, keyed by (section, option).
@@ -105,6 +111,7 @@ RANGES: dict[tuple[str, str], tuple[float, float]] = {
     ("appearance", "padding"): (0, 200),
     ("appearance", "pane_spacing"): (0, 20),
     ("sidebar", "width"): (100, 1000),
+    ("sidebar", "indent"): (4, 64),
 }
 
 _SECTIONS: dict[str, type] = {
