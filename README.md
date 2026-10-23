@@ -17,7 +17,7 @@ Built milestone by milestone from the development specification.
 | M3 Config and themes | Done: five bundled themes, runtime switching, live config reload, system light/dark following, rebindable keys |
 | M4 File tree sidebar | Done: lazy tree, follow mode and pin, live updates, icons, activation actions, context menu, keyboard navigation, filter |
 | M5 Git integration and polish | Done: git status colors, `.gitignore` dimming/hiding, scrollback search, clickable URLs, font zoom, remembered window size |
-| M6 Packaging (`.desktop` file, icon) | Not started |
+| M6 Packaging | Done: launcher entry and icon (`--install-desktop`), install steps per distro, screenshots |
 
 ## Keybindings
 
@@ -46,33 +46,75 @@ Ctrl+= and the keypad's + / - / 0 also zoom. Ctrl+click opens a URL in the outpu
 
 If two actions end up with the same accelerator, a warning is logged and shown as a toast.
 
-## Install (Kubuntu / Ubuntu / Debian)
+## Install
 
-PyGObject, GTK4, libadwaita and VTE come from the distro, not from PyPI.
+PyGObject, GTK4, libadwaita and VTE come from the distro, not from PyPI. Install those,
+then paneterm itself with pipx, and add it to the application menu:
 
 ```sh
-sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-vte-3.91 pipx
 pipx install --system-site-packages .
-paneterm
+paneterm --install-desktop      # launcher + icon for this user, no root needed
 ```
 
-`--system-site-packages` is required so the isolated environment can see the
-distro's `python3-gi`.
+`--system-site-packages` is required so the isolated environment can see the distro's
+`python3-gi`. pipx cannot install a launcher or an icon by itself, which is why
+`--install-desktop` exists: it writes
+`~/.local/share/applications/io.github.paneterm.Paneterm.desktop` and the icon next to it.
+Log out and back in (or wait a moment) if the menu does not show it at once.
 
-To run straight from a checkout instead:
+| Distro | Packages |
+| --- | --- |
+| Kubuntu / Ubuntu / Debian | `sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-vte-3.91 librsvg2-common pipx` |
+| Fedora | `sudo dnf install python3-gobject gtk4 libadwaita vte291-gtk4 librsvg2 pipx` |
+| Arch | `sudo pacman -S python-gobject gtk4 libadwaita vte4 librsvg python-pipx` |
+
+The Debian/Ubuntu line is the one that has been used (it installed and ran on Kubuntu
+26.04 with Python 3.14); the Fedora and Arch names are from those distros' package lists and
+are **not verified**. If `apt` cannot find a package, search with `apt search vte | grep -i gtk4`.
+`librsvg2-common` provides the SVG loader the sidebar icons need.
+
+### Update and uninstall
 
 ```sh
-python3 -m paneterm
+pipx install --system-site-packages --force .   # update from a checkout
+paneterm --uninstall-desktop                    # remove the launcher and icon
+pipx uninstall paneterm
 ```
 
-Fedora: `sudo dnf install python3-gobject gtk4 libadwaita vte291-gtk4`.
+Your settings stay in `~/.config/paneterm/` and `~/.local/state/paneterm/`; delete those
+folders too for a clean removal.
 
-Package names for the VTE GTK4 typelib (`gir1.2-vte-3.91`) have been stable across
-Ubuntu releases, but they have **not** been confirmed on Kubuntu 26.04 itself. If `apt`
-cannot find a package, search with `apt search vte | grep -i gtk4`.
+### Run from a checkout (no install)
 
-Tested so far with GTK 4.14, libadwaita 1.5, VTE 0.76 and Python 3.12 (under Xvfb).
-Not yet tested on Kubuntu 26.04, on Wayland, or with zsh.
+```sh
+python3 -m paneterm             # from the project folder
+python3 -m paneterm --debug     # with debug logging
+python3 -m pytest               # the unit tests (no display needed)
+```
+
+paneterm is a single-instance application: starting it while it is running just brings the
+running window forward, so an installed copy can answer a launch meant for a checkout.
+Quit the installed one first.
+
+Automated checks ran with GTK 4.14, libadwaita 1.5, VTE 0.76 and Python 3.12 under Xvfb.
+Not yet tested on Wayland.
+
+## Screenshots
+
+Splits with the file tree (git status colors, an ignored file dimmed):
+
+![Splits and sidebar](docs/screenshots/splits-and-sidebar.png)
+
+Scrollback search:
+
+![Search](docs/screenshots/search.png)
+
+A light theme (`one-light`):
+
+![Light theme](docs/screenshots/theme-one-light.png)
+
+These were taken in a virtual display without a Nerd Font, so the terminal text uses the
+fallback monospace font.
 
 ## Working directory tracking (OSC 7)
 
