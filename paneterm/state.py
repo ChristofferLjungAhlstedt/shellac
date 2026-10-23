@@ -24,10 +24,17 @@ MIN_WIDTH = 100
 MAX_WIDTH = 1000
 
 
+MIN_WINDOW_WIDTH, MAX_WINDOW_SIDE = 200, 10_000
+MIN_WINDOW_HEIGHT = 150
+
+
 @dataclass
 class UiState:
     sidebar_visible: bool | None = None  # None: never saved, use the config default
     sidebar_width: int | None = None
+    window_width: int | None = None  # size of the window when it is not maximized
+    window_height: int | None = None
+    window_maximized: bool | None = None
 
 
 def state_path() -> Path:
@@ -41,18 +48,28 @@ def load_state(path: Path | None = None) -> UiState:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return UiState()
-    sidebar = data.get("sidebar") if isinstance(data, dict) else None
-    if not isinstance(sidebar, dict):
+    if not isinstance(data, dict):
         return UiState()
+    sidebar = data.get("sidebar")
+    window = data.get("window")
+    sidebar = sidebar if isinstance(sidebar, dict) else {}
+    window = window if isinstance(window, dict) else {}
 
     visible = sidebar.get("visible")
-    width = sidebar.get("width")
-    if not isinstance(width, int) or isinstance(width, bool) or not MIN_WIDTH <= width <= MAX_WIDTH:
-        width = None
+    maximized = window.get("maximized")
     return UiState(
         sidebar_visible=visible if isinstance(visible, bool) else None,
-        sidebar_width=width,
+        sidebar_width=_bounded_int(sidebar.get("width"), MIN_WIDTH, MAX_WIDTH),
+        window_width=_bounded_int(window.get("width"), MIN_WINDOW_WIDTH, MAX_WINDOW_SIDE),
+        window_height=_bounded_int(window.get("height"), MIN_WINDOW_HEIGHT, MAX_WINDOW_SIDE),
+        window_maximized=maximized if isinstance(maximized, bool) else None,
     )
+
+
+def _bounded_int(value: object, low: int, high: int) -> int | None:
+    if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+        return None
+    return value
 
 
 def save_state(state: UiState, path: Path | None = None) -> bool:
@@ -63,10 +80,21 @@ def save_state(state: UiState, path: Path | None = None) -> bool:
         sidebar["visible"] = state.sidebar_visible
     if state.sidebar_width is not None:
         sidebar["width"] = state.sidebar_width
+    window: dict[str, object] = {}
+    for key, value in (
+        ("width", state.window_width),
+        ("height", state.window_height),
+        ("maximized", state.window_maximized),
+    ):
+        if value is not None:
+            window[key] = value
+    document: dict[str, object] = {"sidebar": sidebar}
+    if window:
+        document["window"] = window
     temporary = path.with_suffix(".json.tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temporary.write_text(json.dumps({"sidebar": sidebar}, indent=2) + "\n", encoding="utf-8")
+        temporary.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
         os.replace(temporary, path)
     except OSError as exc:
         log.warning("cannot save state to %s: %s", path, exc.strerror)
