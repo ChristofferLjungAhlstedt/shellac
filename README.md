@@ -178,20 +178,28 @@ follow_cwd = true        # the root follows the focused pane's directory
 show_hidden = false      # H toggles it while the tree is focused
 hide_gitignored = false  # true hides ignored entries; false dims them (I toggles)
 git_status = true        # color and mark changed files (needs git)
-on_file_activate = "editor_split"   # editor_split | paste_path | desktop_open
+on_file_activate = "editor_split"   # editor_split | editor_tab | command_split | command_tab
+                                    # | run | paste_path | desktop_open
+file_command = ""        # for command_*: argv template, e.g. "bat --paging=always {path}"
+keep_pane_open = true    # command_* and run: wait for Enter after the command exits
+always_show = [".gitignore"]        # dotfiles shown even while show_hidden = false
+file_type_icons = true   # language/file-type logos in the tree (false = plain icons)
 on_dir_activate = "cd"              # cd | reroot
 editor = ""              # empty = $VISUAL, then $EDITOR, then nano/vim/vi (may include arguments)
 editor_split_direction = "right"    # right | down
 reveal_in_root = true    # a cd inside the shown tree expands to it instead of re-rooting
 indent = 16              # pixels per tree level
 
+[sidebar.open_with]      # per-extension override of the activation command
+# py = "vim {path}"
+# sh = "bash {path}"
+
 [keybindings]
 copy = "<Ctrl><Shift>c"
 paste = "<Ctrl><Shift>v"
 ```
 
-Keybindings for actions that are not implemented yet (splits, tabs, sidebar, ...) are
-accepted and validated but not bound until their milestone lands.
+Keybindings for actions that are not implemented are accepted and validated but not bound.
 
 ## File tree sidebar
 
@@ -222,6 +230,16 @@ config file is never rewritten.
   takes the index lock, and it re-runs about 300 ms after files change, are saved, or after
   `git add` / `commit` / `checkout` in a shell. More keys: `p` pin, `-` or Backspace go to
   the parent, F5 refresh.
+- **File activation** is configurable with `on_file_activate`: open `$EDITOR` in a split or
+  tab, run `file_command` (placeholders `{path}`, `{dir}`, `{name}`; run as argv, never through
+  a shell), `run` the file itself (must be executable, otherwise a toast explains), paste the
+  quoted path, or hand it to the desktop. `[sidebar.open_with]` maps an extension to its own
+  command and wins over the mode. With `keep_pane_open` the pane stays until you press Enter,
+  so output can be read.
+- **File-type icons**: ~130 extensions and ~25 well-known file names (Dockerfile, Makefile,
+  ...) get a language logo; set `file_type_icons = false` for plain icons. The artwork is from
+  Material Icon Theme (MIT), see `THIRD_PARTY_NOTICES.md`. `.gitignore` and anything in
+  `always_show` is treated like a regular file even when hidden files are off.
 - **Icons** are bundled symbolic SVGs, so no glyph font is needed. They require the SVG
   pixbuf loader (`librsvg2-common`), which a desktop install already has.
 
