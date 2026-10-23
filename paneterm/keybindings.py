@@ -32,8 +32,19 @@ DEFAULT_KEYBINDINGS: dict[str, str] = {
     "copy": "<Ctrl><Shift>c",
     "paste": "<Ctrl><Shift>v",
     "search": "<Ctrl><Shift>f",
+    "zoom_in": "<Ctrl>plus",
+    "zoom_out": "<Ctrl>minus",
+    "zoom_reset": "<Ctrl>0",
     "cycle_theme": "<Ctrl><Shift>p",
     "reload_config": "<Ctrl><Shift>r",
+}
+
+# Extra accelerators bound next to the configured one. "plus" needs Shift on most layouts,
+# so the unshifted key and the keypad also work.
+ACCELERATOR_ALIASES: dict[str, tuple[str, ...]] = {
+    "zoom_in": ("<Ctrl>equal", "<Ctrl>KP_Add"),
+    "zoom_out": ("<Ctrl>KP_Subtract",),
+    "zoom_reset": ("<Ctrl>KP_0",),
 }
 
 _MODIFIER_RE = re.compile(r"<([^<>]+)>")
