@@ -19,6 +19,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_ID  # noqa: E402
 from .config import Config, config_dir, config_path, load_config, user_themes_dir  # noqa: E402
+from .keybindings import ACCELERATOR_ALIASES  # noqa: E402
 from .theme import (  # noqa: E402
     Theme,
     choose_theme_id,
@@ -33,7 +34,7 @@ log = logging.getLogger(__name__)
 
 # Actions the window implements, bound as ``win.<name>``. An action is only bound once
 # the milestone that implements it has landed; the remaining configured bindings
-# (search) are accepted but not registered yet.
+#
 IMPLEMENTED_ACTIONS = (
     "copy",
     "paste",
@@ -57,6 +58,10 @@ IMPLEMENTED_ACTIONS = (
     "reload_config",
     "toggle_sidebar",
     "focus_sidebar",
+    "search",
+    "zoom_in",
+    "zoom_out",
+    "zoom_reset",
 )
 ACTION_TARGETS: dict[str, str] = {name: f"win.{name}" for name in IMPLEMENTED_ACTIONS}
 
@@ -228,7 +233,7 @@ class Application(Adw.Application):
             if target is None:
                 log.debug("no handler for '%s' yet; binding skipped", action)
                 continue
-            self.set_accels_for_action(target, [accel])
+            self.set_accels_for_action(target, [accel, *ACCELERATOR_ALIASES.get(action, ())])
 
     # -- live reload --------------------------------------------------------------------
 
