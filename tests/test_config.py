@@ -110,3 +110,25 @@ def test_defaults_are_not_shared_between_instances():
 def test_config_path_honours_xdg_config_home(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
     assert config_path() == tmp_path / "paneterm" / "config.toml"
+
+
+def test_list_and_table_options_are_validated_and_copied():
+    from paneterm.config import SidebarConfig, parse_config
+
+    result = parse_config({"sidebar": {"always_show": [".env", ".gitignore"]}})
+    assert result.config.sidebar.always_show == [".env", ".gitignore"]
+    assert result.warnings == []
+
+    result = parse_config({"sidebar": {"always_show": [".env", 5]}})
+    assert result.config.sidebar.always_show == SidebarConfig().always_show
+    assert "always_show" in result.warnings[0]
+
+    first, second = parse_config({}).config, parse_config({}).config
+    first.sidebar.always_show.append(".x")
+    assert ".x" not in second.sidebar.always_show
+
+
+def test_gitignore_is_shown_by_default():
+    from paneterm.config import SidebarConfig
+
+    assert ".gitignore" in SidebarConfig().always_show

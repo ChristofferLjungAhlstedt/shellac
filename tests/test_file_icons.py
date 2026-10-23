@@ -27,3 +27,34 @@ def test_symlinks_and_broken_links():
 def test_every_icon_used_is_listed():
     for entry in (Entry("a.py", "/a.py", False), Entry("b", "/b", True)):
         assert icon_name(entry) in ALL_ICON_NAMES
+
+
+def test_logos_by_extension_and_file_name():
+    from paneterm.file_type_icons import logo_name
+
+    assert logo_name("app.js") == "paneterm-ft-javascript"
+    assert logo_name("main.DART") == "paneterm-ft-dart"
+    assert logo_name("Dockerfile") is not None
+    assert logo_name("package.json") != logo_name("other.json")  # exact name wins
+    assert logo_name("mystery.zzzz") is None
+    assert logo_name("noextension") is None
+
+
+def test_logos_are_optional_and_only_for_regular_files():
+    js = Entry("app.js", "/app.js", False)
+    assert icon_name(js, logos=True) == "paneterm-ft-javascript"
+    assert icon_name(js, logos=False) == "paneterm-code-symbolic"
+    assert icon_name(Entry("src.js", "/src.js", True), logos=True) == "paneterm-folder-symbolic"
+    assert icon_name(Entry("a.js", "/a.js", False, True, True), logos=True).endswith(
+        "broken-symbolic"
+    )
+
+
+def test_every_logo_has_a_bundled_file():
+    from pathlib import Path
+
+    from paneterm.file_type_icons import EXTENSION_ICONS, FILENAME_ICONS, ICON_PREFIX
+
+    folder = Path(__file__).parent.parent / "paneterm/resources/icons/hicolor/scalable/mimetypes"
+    for name in {*EXTENSION_ICONS.values(), *FILENAME_ICONS.values()}:
+        assert (folder / f"{ICON_PREFIX}{name}.svg").exists(), name
