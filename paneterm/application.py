@@ -19,6 +19,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_ID  # noqa: E402
 from .config import Config, config_dir, config_path, load_config, user_themes_dir  # noqa: E402
+from .file_tree import register_icons  # noqa: E402
 from .keybindings import ACCELERATOR_ALIASES  # noqa: E402
 from .theme import (  # noqa: E402
     Theme,
@@ -96,6 +97,8 @@ class Application(Adw.Application):
 
     def do_startup(self) -> None:
         Adw.Application.do_startup(self)
+        register_icons()  # also lets an uninstalled checkout find its own icon
+        Gtk.Window.set_default_icon_name(APP_ID)
         self._load_config()
         self._apply()
         self._register_accelerators()
