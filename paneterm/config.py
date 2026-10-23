@@ -22,6 +22,9 @@ class GeneralConfig:
     login_shell: bool = True  # pass -l to the shell (FR-1 asks for a login shell)
     scrollback_lines: int = 10000
     confirm_close_running: bool = True
+    clickable_urls: bool = True  # Ctrl+click opens a URL in the terminal output (FR-6)
+    search_case_sensitive: bool = False  # starting state of the search bar's case toggle
+    search_wrap_around: bool = True  # continue from the other end when a search runs out
 
 
 @dataclass
@@ -55,6 +58,8 @@ class AppearanceConfig:
     focus_indicator: str = "border"  # border | dim | none
     cursor_shape: str = "block"  # block | ibeam | underline
     cursor_blink: bool = False
+    zoom_scope: str = "pane"  # pane | window: what Ctrl+plus / Ctrl+minus resize (FR-8)
+    zoom_step: float = 0.1  # font scale change per step
 
 
 @dataclass
@@ -63,7 +68,8 @@ class SidebarConfig:
     width: int = 260
     follow_cwd: bool = True
     show_hidden: bool = False
-    hide_gitignored: bool = False
+    hide_gitignored: bool = False  # hide ignored entries instead of dimming them
+    git_status: bool = True  # color and mark changed files; needs git installed
     on_file_activate: str = "editor_split"  # editor_split | paste_path | desktop_open
     on_dir_activate: str = "cd"  # cd | reroot
     indent: int = 16  # pixels of indentation per tree level
@@ -95,6 +101,7 @@ class LoadResult:
 ENUMS: dict[tuple[str, str], frozenset[str]] = {
     ("appearance", "focus_indicator"): frozenset({"border", "dim", "none"}),
     ("appearance", "cursor_shape"): frozenset({"block", "ibeam", "underline"}),
+    ("appearance", "zoom_scope"): frozenset({"pane", "window"}),
     ("sidebar", "on_file_activate"): frozenset({"editor_split", "paste_path", "desktop_open"}),
     ("sidebar", "on_dir_activate"): frozenset({"cd", "reroot"}),
     ("sidebar", "editor_split_direction"): frozenset({"right", "down"}),
@@ -110,6 +117,7 @@ RANGES: dict[tuple[str, str], tuple[float, float]] = {
     ("appearance", "opacity"): (0.0, 1.0),
     ("appearance", "padding"): (0, 200),
     ("appearance", "pane_spacing"): (0, 20),
+    ("appearance", "zoom_step"): (0.01, 1.0),
     ("sidebar", "width"): (100, 1000),
     ("sidebar", "indent"): (4, 64),
 }
