@@ -16,6 +16,7 @@ DEFAULT_KEYBINDINGS: dict[str, str] = {
     "close_pane": "<Ctrl><Shift>w",
     "new_tab": "<Ctrl><Shift>t",
     "toggle_sidebar": "<Ctrl><Shift>b",
+    "focus_sidebar": "<Ctrl><Alt>b",
     "zoom_pane": "<Ctrl><Shift>z",
     "focus_left": "<Ctrl><Alt>Left",
     "focus_right": "<Ctrl><Alt>Right",

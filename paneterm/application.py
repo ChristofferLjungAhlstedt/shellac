@@ -33,7 +33,7 @@ log = logging.getLogger(__name__)
 
 # Actions the window implements, bound as ``win.<name>``. An action is only bound once
 # the milestone that implements it has landed; the remaining configured bindings
-# (toggle_sidebar, search) are accepted but not registered yet.
+# (search) are accepted but not registered yet.
 IMPLEMENTED_ACTIONS = (
     "copy",
     "paste",
@@ -55,6 +55,8 @@ IMPLEMENTED_ACTIONS = (
     *(f"goto_tab_{n}" for n in range(1, 10)),
     "cycle_theme",
     "reload_config",
+    "toggle_sidebar",
+    "focus_sidebar",
 )
 ACTION_TARGETS: dict[str, str] = {name: f"win.{name}" for name in IMPLEMENTED_ACTIONS}
 

@@ -22,6 +22,7 @@ from .shell import (  # noqa: E402
     resolve_shell,
     resolve_working_directory,
 )
+from .terminal_actions import foreground_name, is_shell_idle  # noqa: E402
 from .theme import Theme  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ class TerminalPane:
         theme: Theme,
         *,
         cwd: str | None = None,
+        argv: list[str] | None = None,
         on_exited: Callable[[TerminalPane, int], None] | None = None,
         on_title_changed: PaneCallback | None = None,
         on_focus: PaneCallback | None = None,
@@ -98,7 +100,8 @@ class TerminalPane:
         self.terminal.add_controller(self._focus_controller)
 
         self.apply_style(config, theme)
-        self._spawn(config, cwd)
+        self.runs_shell = argv is None  # False for a pane that runs one command, e.g. an editor
+        self._spawn(config, cwd, argv)
 
     # -- appearance ---------------------------------------------------------------------
 
@@ -129,15 +132,18 @@ class TerminalPane:
 
     # -- process ------------------------------------------------------------------------
 
-    def _spawn(self, config: Config, cwd: str | None) -> None:
-        shell = resolve_shell(config.general.shell)
-        argv = [shell, "-l"] if config.general.login_shell else [shell]
+    def _spawn(self, config: Config, cwd: str | None, command: list[str] | None) -> None:
+        if command is not None:
+            argv = command
+        else:
+            shell = resolve_shell(config.general.shell)
+            argv = [shell, "-l"] if config.general.login_shell else [shell]
         self.terminal.spawn_async(
             Vte.PtyFlags.DEFAULT,
             resolve_working_directory(cwd),
             argv,
             build_environment(),
-            GLib.SpawnFlags.DEFAULT,
+            GLib.SpawnFlags.SEARCH_PATH,  # lets a command name like "nano" resolve
             None,  # child_setup
             None,  # child_setup_data
             -1,  # timeout
@@ -184,6 +190,24 @@ class TerminalPane:
     def _handle_focus_enter(self, _controller: Gtk.EventControllerFocus) -> None:
         if self._on_focus is not None:
             self._on_focus(self)
+
+    # -- sending input (section 8.5) -----------------------------------------------------
+
+    def is_idle(self) -> bool:
+        """True when this pane's shell is at a prompt, so typing a command is safe."""
+        if not self.runs_shell or self.child_pid is None:
+            return False
+        pty = self.terminal.get_pty()
+        return pty is not None and is_shell_idle(pty.get_fd(), self.child_pid)
+
+    def busy_with(self) -> str | None:
+        """Name of what is running in the foreground, for messages."""
+        pty = self.terminal.get_pty()
+        return foreground_name(pty.get_fd()) if pty is not None else None
+
+    def send_text(self, text: str) -> None:
+        """Type ``text`` into the terminal as if the user had. Callers check ``is_idle``."""
+        self.terminal.feed_child(text.encode())
 
     # -- clipboard and focus ------------------------------------------------------------
 

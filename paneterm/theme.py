@@ -224,7 +224,38 @@ paned > separator {{
   background-color: {theme.divider};
   background-image: none;
 }}
-{_focus_indicator_css(theme, appearance)}"""
+{_sidebar_css(theme)}{_focus_indicator_css(theme, appearance)}"""
+
+
+def _sidebar_css(theme: Theme) -> str:
+    return f"""
+.paneterm-sidebar {{
+  background-color: {theme.sidebar_background};
+  color: {theme.sidebar_foreground};
+}}
+.paneterm-sidebar listview, .paneterm-sidebar .paneterm-tree {{
+  background: transparent;
+  color: {theme.sidebar_foreground};
+}}
+.paneterm-sidebar .paneterm-tree > row {{
+  padding: 1px 4px;
+  min-height: 24px;
+  border-radius: 4px;
+}}
+.paneterm-sidebar .paneterm-tree > row:hover {{
+  background-color: {_rgba(theme.sidebar_foreground, 0.08)};
+}}
+.paneterm-sidebar .paneterm-tree > row:selected {{
+  background-color: {_rgba(theme.accent, 0.35)};
+  color: {theme.sidebar_foreground};
+}}
+.paneterm-sidebar .hidden-entry {{ opacity: 0.6; }}
+.paneterm-sidebar .error-entry label {{ font-style: italic; opacity: 0.7; }}
+.paneterm-sidebar-header {{ padding: 4px 6px; }}
+.paneterm-sidebar button, .paneterm-sidebar entry, .paneterm-sidebar image {{
+  color: {theme.sidebar_foreground};
+}}
+"""
 
 
 def _focus_indicator_css(theme: Theme, appearance: AppearanceConfig) -> str:

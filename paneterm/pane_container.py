@@ -90,13 +90,23 @@ class PaneContainer:
 
     # -- operations ---------------------------------------------------------------------
 
-    def split(self, axis: Axis) -> TerminalPane | None:
-        """Split the focused pane; the new pane starts in the same directory (FR-11..14)."""
+    def split(
+        self,
+        axis: Axis,
+        *,
+        argv: list[str] | None = None,
+        cwd: str | None = None,
+    ) -> TerminalPane | None:
+        """Split the focused pane; the new pane starts in the same directory (FR-11..14).
+
+        ``argv`` runs that command in the new pane instead of a shell (used to open an
+        editor); ``cwd`` overrides the starting directory.
+        """
         leaf = self.tree.focused
         if leaf is None or self._shut_down:
             return None
         old_pane: TerminalPane = leaf.payload
-        new_pane = self._create_pane(old_pane.current_directory())
+        new_pane = self._create_pane(cwd or old_pane.current_directory(), argv)
 
         new_leaf = self.tree.split(leaf, axis, new_pane)
         self._leaf_for_pane[new_pane] = new_leaf
@@ -217,11 +227,12 @@ class PaneContainer:
 
     # -- pane callbacks -----------------------------------------------------------------
 
-    def _create_pane(self, cwd: str | None) -> TerminalPane:
+    def _create_pane(self, cwd: str | None, argv: list[str] | None = None) -> TerminalPane:
         return TerminalPane(
             self._config,
             self._theme,
             cwd=cwd,
+            argv=argv,
             on_exited=self._pane_exited,
             on_title_changed=self._pane_title_changed,
             on_focus=self._pane_focused,

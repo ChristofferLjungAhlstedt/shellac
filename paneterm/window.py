@@ -2,22 +2,31 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
+from pathlib import Path
 
 import gi
 
 gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
-from gi.repository import Adw, Gio, Gtk  # noqa: E402
+from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_NAME  # noqa: E402
 from .config import Config  # noqa: E402
+from .file_tree import FileTree, register_icons  # noqa: E402
+from .file_tree_model import Node  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
+from .state import MAX_WIDTH, MIN_WIDTH, UiState, load_state, save_state  # noqa: E402
+from .terminal_actions import cd_command, editor_argv, path_text  # noqa: E402
 from .theme import Theme  # noqa: E402
 
 MAX_TAB_SHORTCUTS = 9
+FOLLOW_DEBOUNCE_MS = 150  # wait for rapid directory changes to settle (section 8.4)
+FOLLOW_POLL_MS = 1000  # fallback for shells that do not report their directory (OSC 7)
+STATE_SAVE_DELAY_MS = 400  # after the last sidebar resize
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -38,6 +47,15 @@ class MainWindow(Adw.ApplicationWindow):
         self._config = config
         self._theme = theme
         self._containers: dict[Adw.TabPage, PaneContainer] = {}
+        self._follow_timer = 0
+        self._state_timer = 0
+        self._last_followed: str | None = None
+
+        register_icons()
+        self._state = load_state()
+        visible = self._state.sidebar_visible
+        self._sidebar_visible = config.sidebar.visible if visible is None else visible
+        self._sidebar_width = self._state.sidebar_width or config.sidebar.width
 
         self._tab_view = Adw.TabView()
         # Our own configurable accelerators replace the tab view's built-in ones.
@@ -51,16 +69,46 @@ class MainWindow(Adw.ApplicationWindow):
 
         new_tab_button = Gtk.Button(icon_name="list-add-symbolic", tooltip_text="New tab")
         new_tab_button.set_action_name("win.new_tab")
+        sidebar_button = Gtk.Button(
+            icon_name="paneterm-sidebar-symbolic", tooltip_text="Toggle sidebar"
+        )
+        sidebar_button.set_action_name("win.toggle_sidebar")
         header = Adw.HeaderBar()
+        header.pack_start(sidebar_button)
         header.pack_start(new_tab_button)
 
         self._toasts = Adw.ToastOverlay()
         self._toasts.set_child(self._tab_view)
 
+        self._sidebar = FileTree(
+            config.sidebar,
+            on_activate=self._on_sidebar_activate,
+            on_open_tab=lambda path: self.new_tab(cwd=path),
+            on_message=self.show_toast,
+            on_leave=self._focus_current,
+            on_pin_changed=self._on_pin_changed,
+        )
+        self._sidebar.set_size_request(MIN_WIDTH, -1)
+        self._sidebar.set_visible(self._sidebar_visible)
+        self._sidebar.set_root(str(Path.home()))
+
+        right = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        right.append(self._tab_bar)
+        self._toasts.set_vexpand(True)
+        right.append(self._toasts)
+
+        self._paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self._paned.set_start_child(self._sidebar)
+        self._paned.set_end_child(right)
+        self._paned.set_shrink_start_child(False)
+        self._paned.set_resize_start_child(False)
+        self._paned.set_shrink_end_child(False)
+        self._paned.set_position(self._sidebar_width)
+        self._paned.connect("notify::position", self._on_paned_moved)
+
         toolbar = Adw.ToolbarView()
         toolbar.add_top_bar(header)
-        toolbar.add_top_bar(self._tab_bar)
-        toolbar.set_content(self._toasts)
+        toolbar.set_content(self._paned)
         self.set_content(toolbar)
 
         self._setup_actions()
@@ -72,6 +120,8 @@ class MainWindow(Adw.ApplicationWindow):
             self.show_toast(f"{len(warnings)} configuration {noun}. See the log for details.")
 
         self.connect("map", lambda *_: self._focus_current())
+        self._poll_id = GLib.timeout_add(FOLLOW_POLL_MS, self._poll_follow)
+        self._schedule_follow()
 
     # -- config -------------------------------------------------------------------------
 
@@ -83,16 +133,17 @@ class MainWindow(Adw.ApplicationWindow):
         self._config = config
         self._theme = theme
         self._tab_bar.set_autohide(config.tabs.autohide)
+        self._sidebar.apply_config(config.sidebar)
+        self._sidebar.set_show_hidden(config.sidebar.show_hidden)
         for container in self._containers.values():
             container.apply_style(config, theme)
 
     # -- tabs ---------------------------------------------------------------------------
 
-    def new_tab(self) -> PaneContainer:
-        """Open a tab in the focused pane's directory (FR-22)."""
+    def new_tab(self, cwd: str | None = None) -> PaneContainer:
+        """Open a tab in the focused pane's directory, or in ``cwd`` (FR-22)."""
         current = self._current_container()
-        cwd = None
-        if current is not None and current.focused_pane is not None:
+        if cwd is None and current is not None and current.focused_pane is not None:
             cwd = current.focused_pane.current_directory()
 
         container = PaneContainer(
@@ -131,11 +182,13 @@ class MainWindow(Adw.ApplicationWindow):
         page.set_title(title or APP_NAME)
         if page == self._tab_view.get_selected_page():
             self.set_title(title or APP_NAME)
+            self._schedule_follow()
 
     def _on_selected_page_changed(self, *_args: object) -> None:
         container = self._current_container()
         if container is not None:
             self.set_title(container.title or APP_NAME)
+            self._schedule_follow()
             container_pane = container.focused_pane
             if container_pane is not None:
                 container_pane.grab_focus()
@@ -178,6 +231,8 @@ class MainWindow(Adw.ApplicationWindow):
 
             return run
 
+        self._add_action("toggle_sidebar", self.toggle_sidebar)
+        self._add_action("focus_sidebar", self.focus_sidebar)
         self._add_action("copy", on_pane("copy"))
         self._add_action("paste", on_pane("paste"))
         self._add_action("cycle_theme", lambda: self.get_application().cycle_theme())
@@ -208,12 +263,167 @@ class MainWindow(Adw.ApplicationWindow):
         action.connect("activate", lambda *_: callback())
         self.add_action(action)
 
+    # -- sidebar ------------------------------------------------------------------------
+
+    def toggle_sidebar(self) -> None:
+        """Show or hide the sidebar (FR-24). Focus goes back to the terminal when hiding."""
+        self._set_sidebar_visible(not self._sidebar.get_visible())
+
+    def focus_sidebar(self) -> None:
+        if not self._sidebar.get_visible():
+            self._set_sidebar_visible(True)
+        self._sidebar.focus_tree()
+
+    def _set_sidebar_visible(self, visible: bool) -> None:
+        had_focus = self._sidebar.has_focus_inside()
+        self._sidebar.set_visible(visible)
+        self._sidebar_visible = visible
+        if visible:
+            self._paned.set_position(self._sidebar_width)
+            self._schedule_follow()
+        elif had_focus:
+            self._focus_current()
+        self._save_state_soon()
+
+    def _on_paned_moved(self, *_args: object) -> None:
+        if not self._sidebar.get_visible():
+            return
+        width = self._paned.get_position()
+        if MIN_WIDTH <= width <= MAX_WIDTH and width != self._sidebar_width:
+            self._sidebar_width = width
+            self._save_state_soon()
+
+    def _save_state_soon(self) -> None:
+        if self._state_timer:
+            GLib.source_remove(self._state_timer)
+        self._state_timer = GLib.timeout_add(STATE_SAVE_DELAY_MS, self._save_state)
+
+    def _save_state(self) -> bool:
+        self._state_timer = 0
+        save_state(
+            UiState(sidebar_visible=self._sidebar_visible, sidebar_width=self._sidebar_width)
+        )
+        return GLib.SOURCE_REMOVE
+
+    def _on_pin_changed(self, pinned: bool) -> None:
+        if not pinned:
+            self._last_followed = None
+            self._schedule_follow()
+
+    # -- follow mode (section 8.4) ------------------------------------------------------
+
+    def _schedule_follow(self) -> None:
+        if self._follow_timer:
+            GLib.source_remove(self._follow_timer)
+        self._follow_timer = GLib.timeout_add(FOLLOW_DEBOUNCE_MS, self._follow_now)
+
+    def _poll_follow(self) -> bool:
+        if self._sidebar.get_visible():
+            self._sidebar.check_root()
+        self._follow_now()
+        return GLib.SOURCE_CONTINUE
+
+    def _follow_now(self) -> bool:
+        self._follow_timer = 0
+        sidebar_config = self._config.sidebar
+        if not sidebar_config.follow_cwd or self._sidebar.pinned:
+            return GLib.SOURCE_REMOVE
+        if not self._sidebar.get_visible():
+            return GLib.SOURCE_REMOVE
+        container = self._current_container()
+        pane = container.focused_pane if container is not None else None
+        cwd = pane.current_directory() if pane is not None else None
+        if not cwd or not os.path.isdir(cwd):
+            return GLib.SOURCE_REMOVE
+        cwd = os.path.normpath(cwd)
+        if cwd == self._last_followed and self._sidebar.root_path is not None:
+            return GLib.SOURCE_REMOVE
+        self._last_followed = cwd
+        root = self._sidebar.root_path
+        if (
+            root
+            and cwd != root
+            and sidebar_config.reveal_in_root
+            and self._sidebar.model.contains(cwd)
+        ):
+            self._sidebar.reveal(cwd, expand=True)
+        elif cwd != root:
+            self._sidebar.set_root(cwd)
+        return GLib.SOURCE_REMOVE
+
+    # -- activation (FR-32, section 8.5) ------------------------------------------------
+
+    def _on_sidebar_activate(self, node: Node) -> None:
+        if node.is_dir:
+            self._activate_directory(node.path)
+        else:
+            self._activate_file(node.path)
+
+    def _focused_pane(self):  # noqa: ANN202
+        container = self._current_container()
+        return container.focused_pane if container is not None else None
+
+    def _activate_directory(self, path: str) -> None:
+        if self._config.sidebar.on_dir_activate == "reroot":
+            self._sidebar.set_root(path)
+            return
+        pane = self._focused_pane()
+        if pane is None:
+            return
+        if not pane.is_idle():
+            busy = pane.busy_with()
+            what = f" ({busy} is running)" if busy else ""
+            self.show_toast(f"Pane is busy{what}; not typing into it")
+            return
+        pane.send_text(cd_command(path))
+
+    def _activate_file(self, path: str) -> None:
+        mode = self._config.sidebar.on_file_activate
+        if mode == "paste_path":
+            pane = self._focused_pane()
+            if pane is not None:
+                pane.terminal.paste_text(path_text(path))
+                pane.grab_focus()
+        elif mode == "desktop_open":
+            launcher = Gtk.FileLauncher.new(Gio.File.new_for_path(path))
+            launcher.launch(self, None, self._launch_finished, launcher)
+        else:
+            argv = editor_argv(path, self._config.sidebar.editor)
+            if argv is None:
+                self.show_toast("No editor found. Set [sidebar] editor or $EDITOR")
+                return
+            container = self._current_container()
+            if container is None:
+                return
+            axis = (
+                Axis.VERTICAL
+                if self._config.sidebar.editor_split_direction == "down"
+                else Axis.HORIZONTAL
+            )
+            container.split(axis, argv=argv, cwd=os.path.dirname(path))
+
+    def _launch_finished(
+        self, launcher: Gtk.FileLauncher, result: Gio.AsyncResult, _l: object
+    ) -> None:
+        try:
+            launcher.launch_finish(result)
+        except GLib.Error as exc:
+            self.show_toast(f"Cannot open file: {exc.message}")
+
     def show_toast(self, message: str) -> None:
         self._toasts.add_toast(Adw.Toast.new(message))
 
     # -- lifecycle ----------------------------------------------------------------------
 
     def do_close_request(self) -> bool:
+        for source in (self._follow_timer, self._poll_id):
+            if source:
+                GLib.source_remove(source)
+        self._follow_timer = self._poll_id = 0
+        if self._state_timer:
+            GLib.source_remove(self._state_timer)
+            self._save_state()
+        self._sidebar.close()
         # End every shell so nothing is left running after the window closes (M2 acceptance).
         for container in list(self._containers.values()):
             container.shutdown()
