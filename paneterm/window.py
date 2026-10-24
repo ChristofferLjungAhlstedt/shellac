@@ -74,7 +74,13 @@ class MainWindow(Adw.ApplicationWindow):
         self._tab_bar.set_view(self._tab_view)
         self._tab_bar.set_autohide(config.tabs.autohide)
 
-        new_tab_button = Gtk.Button(icon_name="paneterm-plus-symbolic", tooltip_text="New tab")
+        new_tab_button = Gtk.Button(tooltip_text="New tab")
+        # Fall back to a text "+" if the bundled icon cannot be found (a stale install),
+        # so the button is never invisible.
+        if Gtk.IconTheme.get_for_display(self.get_display()).has_icon("paneterm-plus-symbolic"):
+            new_tab_button.set_icon_name("paneterm-plus-symbolic")
+        else:
+            new_tab_button.set_label("+")
         new_tab_button.set_action_name("win.new_tab")
         sidebar_button = Gtk.Button(
             icon_name="paneterm-sidebar-symbolic", tooltip_text="Toggle sidebar"
@@ -284,8 +290,20 @@ class MainWindow(Adw.ApplicationWindow):
             )
             self._add_action(
                 f"resize_{direction.value}",
-                on_container(lambda c, d=direction: c.resize(d)),
+                lambda d=direction: self._resize(d),
             )
+
+    def _resize(self, direction: Direction) -> None:
+        """Move a divider: the sidebar's while it has focus, else the focused pane's."""
+        if self._sidebar.get_visible() and self._sidebar.has_focus_inside():
+            if direction.axis is Axis.HORIZONTAL:
+                step = self._config.panes.resize_step * direction.sign
+                width = self._paned.get_position() + step
+                self._paned.set_position(max(MIN_WIDTH, min(MAX_WIDTH, width)))
+            return
+        container = self._current_container()
+        if container is not None:
+            container.resize(direction)
 
     def _add_action(self, name: str, callback: Callable[[], object]) -> None:
         action = Gio.SimpleAction.new(name, None)
