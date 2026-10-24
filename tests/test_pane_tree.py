@@ -137,17 +137,25 @@ def test_closing_any_pane_in_a_grid_leaves_a_consistent_tree():
         assert_consistent(tree)
 
 
-def test_closing_the_focused_pane_focuses_the_nearest_leaf_in_the_sibling():
+def test_closing_the_focused_pane_returns_to_the_previously_focused_pane():
     tree = PaneTree("a")
     b = tree.split(tree.focused, Axis.HORIZONTAL, "b")
     c = tree.split(b, Axis.VERTICAL, "c")
     d = tree.split(c, Axis.HORIZONTAL, "d")  # a | (b / (c | d))
     tree.set_focus(by_payload(tree, "a"))
-    tree.close(by_payload(tree, "a"))  # a was first, so nearest in the sibling is its first leaf
-    assert tree.focused.payload == "b"
+    tree.set_focus(by_payload(tree, "b"))
     tree.set_focus(d)
-    tree.close(d)  # d was second, sibling is c
-    assert tree.focused.payload == "c"
+    tree.close(d)  # focus order was a, b, d: back to b, not the sibling c
+    assert tree.focused.payload == "b"
+    tree.close(b)
+    assert tree.focused.payload == "a"
+
+
+def test_closing_a_pane_with_no_history_uses_the_neighbour():
+    tree = PaneTree("a")
+    b = tree.split(tree.focused, Axis.HORIZONTAL, "b")
+    tree.close(b)
+    assert tree.focused.payload == "a"
 
 
 def test_closing_an_unfocused_pane_keeps_focus():
