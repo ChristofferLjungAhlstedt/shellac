@@ -197,7 +197,12 @@ class PaneTree:
         if len(self.leaves()) == 1:
             self.zoomed = None
         if was_focused:
-            self.set_focus(self._nearest_leaf(sibling, from_start=started_first))
+            # Go back to the pane that had focus before this one; fall back to the
+            # neighbour that took over the freed space.
+            previous = next((leaf for leaf in self._recent if leaf.parent is not None), None)
+            if previous is None:
+                previous = self._nearest_leaf(sibling, from_start=started_first)
+            self.set_focus(previous)
         return self.focused
 
     @staticmethod
