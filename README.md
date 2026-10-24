@@ -208,6 +208,8 @@ visible and how wide it is are remembered in `~/.local/state/paneterm/state.json
 wins over `[sidebar] visible/width` (those are only the first-launch defaults). Your
 config file is never rewritten.
 
+- **Resizing**: drag the divider, or press Ctrl+Shift+Alt+Left/Right while the tree has focus
+  (same keys as pane resizing; the step is `[panes] resize_step`).
 - **Follow mode** (default): the tree follows the focused pane's directory, debounced
   by 150 ms. If the directory is inside the tree, it is expanded and scrolled to instead of
   re-rooting. The pin button locks the root for this window.
