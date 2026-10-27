@@ -13,6 +13,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_TITLE  # noqa: E402
+from .command_palette import CommandPalette  # noqa: E402
 from .config import Config  # noqa: E402
 from .file_actions import Problem, plan_file_action  # noqa: E402
 from .file_tree import FileTree, register_icons  # noqa: E402
@@ -54,6 +55,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._containers: dict[Adw.TabPage, PaneContainer] = {}
         self._follow_timer = 0
         self._state_timer = 0
+        self._palette: CommandPalette | None = None
         self._last_followed: str | None = None
         self._font_scale = 1.0
         self._status_toast: Adw.Toast | None = None
@@ -160,6 +162,8 @@ class MainWindow(Adw.ApplicationWindow):
         self._config = config
         self._theme = theme
         self._tab_bar.set_autohide(config.tabs.autohide)
+        if self._palette is not None:
+            self._palette.set_bindings(self._application_bindings())
         self._sidebar.apply_config(config.sidebar)
         self._sidebar.set_show_hidden(config.sidebar.show_hidden)
         for container in self._containers.values():
@@ -263,6 +267,7 @@ class MainWindow(Adw.ApplicationWindow):
             return run
 
         self._add_action("search", self.open_search)
+        self._add_action("command_palette", self.open_palette)
         self._add_action("zoom_in", lambda: self._zoom(+1))
         self._add_action("zoom_out", lambda: self._zoom(-1))
         self._add_action("zoom_reset", lambda: self._zoom(0))
@@ -309,6 +314,32 @@ class MainWindow(Adw.ApplicationWindow):
         action = Gio.SimpleAction.new(name, None)
         action.connect("activate", lambda *_: callback())
         self.add_action(action)
+
+    # -- command palette -----------------------------------------------------------------
+
+    def _application_bindings(self) -> dict[str, list[str]]:
+        app = self.get_application()
+        return app.keybindings() if app is not None else {}
+
+    def open_palette(self) -> None:
+        """Show the command palette (created on first use, then reused)."""
+        app = self.get_application()
+        if app is None:
+            return
+        if self._palette is None:
+            self._palette = CommandPalette(
+                self,
+                self._application_bindings(),
+                run=self._run_palette_action,
+                on_change=app.save_keybindings,
+            )
+        self._palette.set_bindings(self._application_bindings())
+        self._palette.open()
+
+    def _run_palette_action(self, action: str) -> None:
+        self.present()
+        # Let the main window take focus first, so the action sees the right pane.
+        GLib.idle_add(lambda: self.activate_action(f"win.{action}", None) and False)
 
     # -- search and zoom (FR-7, FR-8) ------------------------------------------------------
 
@@ -514,6 +545,9 @@ class MainWindow(Adw.ApplicationWindow):
         if self._state_timer:
             GLib.source_remove(self._state_timer)
         self._save_state()  # also remembers the window size
+        if self._palette is not None:
+            self._palette.destroy()
+            self._palette = None
         self._sidebar.close()
         # End every shell so nothing is left running after the window closes (M2 acceptance).
         for container in list(self._containers.values()):
