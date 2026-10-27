@@ -21,12 +21,14 @@ from . import APP_ID  # noqa: E402
 from .config import Config, config_dir, config_path, load_config, user_themes_dir  # noqa: E402
 from .file_tree import register_icons  # noqa: E402
 from .keybindings import ACCELERATOR_ALIASES  # noqa: E402
+from .state import load_state, save_state  # noqa: E402
 from .theme import (  # noqa: E402
     Theme,
     choose_theme_id,
     generate_css,
     get_theme,
     next_theme_id,
+    theme_basis,
     theme_ids,
 )
 from .window import MainWindow  # noqa: E402
@@ -100,6 +102,7 @@ class Application(Adw.Application):
         register_icons()  # also lets an uninstalled checkout find its own icon
         Gtk.Window.set_default_icon_name(APP_ID)
         self._load_config()
+        self._restore_saved_theme()
         self._apply()
         self._register_accelerators()
         Adw.StyleManager.get_default().connect("notify::dark", self._on_system_scheme_changed)
@@ -133,6 +136,26 @@ class Application(Adw.Application):
         self._resolve_theme()
         for warning in self.warnings:
             log.warning("config: %s", warning)
+
+    def _restore_saved_theme(self) -> None:
+        """Bring back the theme picked in the last session, if the config still agrees."""
+        state = load_state()
+        if state.theme is None or state.theme_basis != theme_basis(self.config.appearance):
+            return
+        if state.theme not in theme_ids():
+            return
+        self._theme_override = state.theme
+        self._resolve_theme()
+
+    def _remember_theme(self) -> None:
+        """Store (or clear) the runtime theme choice in the state file, not in the config."""
+        state = load_state()
+        if self._theme_override is None:
+            state.theme = state.theme_basis = None
+        else:
+            state.theme = self._theme_override
+            state.theme_basis = theme_basis(self.config.appearance)
+        save_state(state)
 
     def _resolve_theme(self) -> None:
         """Choose and load the theme: a runtime override, the system's, or the config's."""
@@ -197,6 +220,7 @@ class Application(Adw.Application):
         self._theme_override = next_theme_id(self.theme.id, theme_ids())
         self.warnings = []
         self._resolve_theme()
+        self._remember_theme()
         self._apply()
         message = f"Theme: {self.theme.name}"
         if was_following:
@@ -207,6 +231,7 @@ class Application(Adw.Application):
         """Re-read config, themes and keybindings and apply them (FR-46)."""
         if not keep_override:
             self._theme_override = None
+            self._remember_theme()
         self._load_config()
         self._apply()
         self._register_accelerators()

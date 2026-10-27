@@ -67,3 +67,17 @@ def test_window_state_round_trip_and_validation(tmp_path: Path):
     assert load_state(path) == UiState()
     path.write_text(json.dumps({"window": 3, "sidebar": {"visible": True}}))
     assert load_state(path) == UiState(sidebar_visible=True)
+
+
+def test_theme_choice_round_trips_and_bad_values_are_ignored(tmp_path: Path):
+    path = tmp_path / "state.json"
+    assert save_state(UiState(theme="nord", theme_basis="a|b|c|False"), path)
+    loaded = load_state(path)
+    assert (loaded.theme, loaded.theme_basis) == ("nord", "a|b|c|False")
+
+    path.write_text(json.dumps({"appearance": {"theme": 5, "theme_basis": ["x"]}}))
+    loaded = load_state(path)
+    assert (loaded.theme, loaded.theme_basis) == (None, None)
+
+    assert save_state(UiState(), path)
+    assert "appearance" not in json.loads(path.read_text())

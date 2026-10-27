@@ -370,7 +370,8 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _save_state(self) -> bool:
         self._state_timer = 0
-        state = self._state
+        # Re-read first: the application stores the chosen theme in the same file.
+        state = self._state = load_state()
         state.sidebar_visible = self._sidebar_visible
         state.sidebar_width = self._sidebar_width
         state.window_maximized = self.is_maximized()

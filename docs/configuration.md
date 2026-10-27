@@ -132,7 +132,7 @@ the tab bar and keybindings. Ctrl+Shift+R reloads on demand.
 
 - A mistake never breaks a running window: an invalid value, an unknown theme or broken
   TOML logs a warning, shows one toast, and uses the default for that value.
-- A theme picked with Ctrl+Shift+P lasts until the config is reloaded or edited. While
+- A theme picked with Ctrl+Shift+P is remembered between sessions (in `~/.local/state/shellac/state.json`, never in your config). It lasts until the config is reloaded or edited, or until you change `theme`, `dark_theme`, `light_theme` or `follow_system_scheme` in the config. While
   following the system scheme, cycling pauses the following until the next reload.
 - Settings that only matter at creation (`shell`, `login_shell`, window size) apply to
   new panes and tabs, not to shells that are already running.

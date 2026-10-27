@@ -127,6 +127,22 @@ def next_theme_id(current: str, ids: list[str]) -> str:
     return ids[(ids.index(current) + 1) % len(ids)]
 
 
+def theme_basis(appearance: AppearanceConfig) -> str:
+    """The config's theme settings as one string.
+
+    A theme picked at runtime is only restored while this is unchanged, so editing
+    ``theme``, ``dark_theme`` or ``light_theme`` in the config takes effect.
+    """
+    return "|".join(
+        (
+            appearance.theme,
+            appearance.dark_theme,
+            appearance.light_theme,
+            str(appearance.follow_system_scheme),
+        )
+    )
+
+
 def choose_theme_id(appearance: AppearanceConfig, system_dark: bool | None) -> str:
     """Which theme the config asks for (FR-43).
 

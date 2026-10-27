@@ -177,3 +177,17 @@ def test_choose_theme_id_following_picks_by_system_scheme():
     assert choose_theme_id(appearance, system_dark=False) == "one-light"
     # Unknown system preference: fall back to the plain theme setting.
     assert choose_theme_id(appearance, system_dark=None) == "nord"
+
+
+def test_theme_basis_changes_with_any_theme_setting():
+    from shellac.theme import theme_basis
+
+    base = AppearanceConfig()
+    assert theme_basis(base) == theme_basis(AppearanceConfig())
+    for change in (
+        {"theme": "nord"},
+        {"dark_theme": "nord"},
+        {"light_theme": "nord"},
+        {"follow_system_scheme": not base.follow_system_scheme},
+    ):
+        assert theme_basis(AppearanceConfig(**change)) != theme_basis(base)

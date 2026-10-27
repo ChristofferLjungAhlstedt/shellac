@@ -1,7 +1,8 @@
 """Remembered UI state, kept apart from the user's config (FR-24).
 
 The config file is the user's to edit; the app must never rewrite it. What the user
-changes by clicking (sidebar visibility and width) is stored here instead, in
+changes by clicking (sidebar visibility and width, a theme picked with the cycle-theme
+key) is stored here instead, in
 ``$XDG_STATE_HOME/shellac/state.json``. Values in this file win over the config's
 ``[sidebar] visible`` / ``width``, which act as the defaults for a first launch.
 
@@ -35,6 +36,8 @@ class UiState:
     window_width: int | None = None  # size of the window when it is not maximized
     window_height: int | None = None
     window_maximized: bool | None = None
+    theme: str | None = None  # a theme picked at runtime (Ctrl+Shift+P), None: use the config
+    theme_basis: str | None = None  # the config's theme settings when it was picked
 
 
 def state_path() -> Path:
@@ -52,6 +55,8 @@ def load_state(path: Path | None = None) -> UiState:
         return UiState()
     sidebar = data.get("sidebar")
     window = data.get("window")
+    appearance = data.get("appearance")
+    appearance = appearance if isinstance(appearance, dict) else {}
     sidebar = sidebar if isinstance(sidebar, dict) else {}
     window = window if isinstance(window, dict) else {}
 
@@ -63,7 +68,13 @@ def load_state(path: Path | None = None) -> UiState:
         window_width=_bounded_int(window.get("width"), MIN_WINDOW_WIDTH, MAX_WINDOW_SIDE),
         window_height=_bounded_int(window.get("height"), MIN_WINDOW_HEIGHT, MAX_WINDOW_SIDE),
         window_maximized=maximized if isinstance(maximized, bool) else None,
+        theme=_text(appearance.get("theme")),
+        theme_basis=_text(appearance.get("theme_basis")),
     )
+
+
+def _text(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None
 
 
 def _bounded_int(value: object, low: int, high: int) -> int | None:
@@ -91,6 +102,8 @@ def save_state(state: UiState, path: Path | None = None) -> bool:
     document: dict[str, object] = {"sidebar": sidebar}
     if window:
         document["window"] = window
+    if state.theme is not None:
+        document["appearance"] = {"theme": state.theme, "theme_basis": state.theme_basis or ""}
     temporary = path.with_suffix(".json.tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
