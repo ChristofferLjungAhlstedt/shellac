@@ -8,6 +8,7 @@ which pushes it to every pane, so a theme or config change updates everything at
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 import gi
@@ -20,7 +21,8 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 from . import APP_ID  # noqa: E402
 from .config import Config, config_dir, config_path, load_config, user_themes_dir  # noqa: E402
 from .file_tree import register_icons  # noqa: E402
-from .keybindings import ACCELERATOR_ALIASES  # noqa: E402
+from .keybinding_edit import save_binding_changes  # noqa: E402
+from .keybindings import ACCELERATOR_ALIASES, all_bindings  # noqa: E402
 from .state import load_state, save_state  # noqa: E402
 from .theme import (  # noqa: E402
     Theme,
@@ -65,6 +67,7 @@ IMPLEMENTED_ACTIONS = (
     "zoom_in",
     "zoom_out",
     "zoom_reset",
+    "command_palette",
 )
 ACTION_TARGETS: dict[str, str] = {name: f"win.{name}" for name in IMPLEMENTED_ACTIONS}
 
@@ -90,6 +93,8 @@ class Application(Adw.Application):
         self.warnings: list[str] = []
 
         self._theme_override: str | None = None  # set by cycle_theme, cleared by a reload
+        self._override_basis = ""  # the config's theme settings when it was set
+        self._last_self_write = -1e9  # when the palette last saved shortcuts to the config
         self._css_provider: Gtk.CssProvider | None = None
         self._monitors: list[Gio.FileMonitor] = []
         self._reload_source = 0
@@ -145,6 +150,7 @@ class Application(Adw.Application):
         if state.theme not in theme_ids():
             return
         self._theme_override = state.theme
+        self._override_basis = state.theme_basis
         self._resolve_theme()
 
     def _remember_theme(self) -> None:
@@ -218,6 +224,7 @@ class Application(Adw.Application):
         """
         was_following = self._following_system()
         self._theme_override = next_theme_id(self.theme.id, theme_ids())
+        self._override_basis = theme_basis(self.config.appearance)
         self.warnings = []
         self._resolve_theme()
         self._remember_theme()
@@ -227,15 +234,46 @@ class Application(Adw.Application):
             message += " (not following the system until the config is reloaded)"
         self._notify(message, self.warnings)
 
-    def reload_config(self, *, keep_override: bool = False) -> None:
-        """Re-read config, themes and keybindings and apply them (FR-46)."""
-        if not keep_override:
+    def reload_config(
+        self, *, keep_override: bool = False, soft: bool = False, quiet: bool = False
+    ) -> None:
+        """Re-read config, themes and keybindings and apply them (FR-46).
+
+        A theme picked at runtime is dropped unless ``keep_override``. With ``soft`` it is
+        dropped only if the config's own theme settings changed, so saving an unrelated
+        setting (or a shortcut from the palette) leaves the picked theme alone.
+        """
+        if not keep_override and not soft:
             self._theme_override = None
             self._remember_theme()
         self._load_config()
+        if (
+            soft
+            and not keep_override
+            and self._theme_override is not None
+            and theme_basis(self.config.appearance) != self._override_basis
+        ):
+            self._theme_override = None
+            self._remember_theme()
+            self._resolve_theme()
         self._apply()
         self._register_accelerators()
+        if quiet and not self.warnings:
+            return
         self._notify("Configuration reloaded", self.warnings)
+
+    def save_keybindings(self, changes: dict[str, list[str] | None]) -> str | None:
+        """Write shortcut changes into the config file; the file watcher then reloads it.
+
+        Returns an error message, or None on success. Only the changed lines are touched.
+        """
+        error = save_binding_changes(Path(self._config_file or config_path()), changes)
+        if error is None:
+            self._last_self_write = time.monotonic()
+        return error
+
+    def keybindings(self) -> dict[str, list[str]]:
+        return all_bindings(self.config.keybindings, self.config.extra_bindings)
 
     def _notify(self, message: str, warnings: list[str]) -> None:
         """Show one toast: the warnings count if there are any, else ``message``."""
@@ -256,12 +294,12 @@ class Application(Adw.Application):
         # Clear first, so a binding the user removed or moved does not linger after a reload.
         for target in ACTION_TARGETS.values():
             self.set_accels_for_action(target, [])
-        for action, accel in self.config.keybindings.items():
+        for action, accels in self.keybindings().items():
             target = ACTION_TARGETS.get(action)
             if target is None:
                 log.debug("no handler for '%s' yet; binding skipped", action)
                 continue
-            self.set_accels_for_action(target, [accel, *ACCELERATOR_ALIASES.get(action, ())])
+            self.set_accels_for_action(target, [*accels, *ACCELERATOR_ALIASES.get(action, ())])
 
     # -- live reload --------------------------------------------------------------------
 
@@ -327,5 +365,6 @@ class Application(Adw.Application):
         self._reload_source = 0
         keep, self._reload_keeps_override = self._reload_keeps_override, True
         log.debug("config files changed; reloading")
-        self.reload_config(keep_override=keep)
+        quiet = time.monotonic() - self._last_self_write < 3.0
+        self.reload_config(keep_override=keep, soft=True, quiet=quiet)
         return GLib.SOURCE_REMOVE
