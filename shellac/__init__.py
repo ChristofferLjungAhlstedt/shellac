@@ -7,4 +7,5 @@ __version__ = "0.1.0"
 
 # Everything that depends on the app's name derives from these (plus pyproject.toml).
 APP_NAME = "shellac"
+APP_TITLE = "Shellac"
 APP_ID = "io.github.shellac.Shellac"

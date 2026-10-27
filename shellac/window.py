@@ -12,7 +12,7 @@ gi.require_version("Adw", "1")
 gi.require_version("Gtk", "4.0")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
-from . import APP_NAME  # noqa: E402
+from . import APP_TITLE  # noqa: E402
 from .config import Config  # noqa: E402
 from .file_actions import Problem, plan_file_action  # noqa: E402
 from .file_tree import FileTree, register_icons  # noqa: E402
@@ -42,7 +42,7 @@ class MainWindow(Adw.ApplicationWindow):
         saved = load_state()  # remembered size wins over the config's first-launch default
         super().__init__(
             application=app,
-            title=APP_NAME,
+            title=APP_TITLE,
             default_width=saved.window_width or config.window.width,
             default_height=saved.window_height or config.window.height,
         )
@@ -185,7 +185,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_title_changed=self._on_container_title_changed,
         )
         page = self._tab_view.append(container.widget)
-        page.set_title(container.title or APP_NAME)
+        page.set_title(container.title or APP_TITLE)
         self._containers[page] = container
         self._tab_view.set_selected_page(page)
         return container
@@ -210,15 +210,15 @@ class MainWindow(Adw.ApplicationWindow):
         page = self._tab_view.get_page(container.widget)
         if page is None:
             return
-        page.set_title(title or APP_NAME)
+        page.set_title(title or APP_TITLE)
         if page == self._tab_view.get_selected_page():
-            self.set_title(title or APP_NAME)
+            self.set_title(title or APP_TITLE)
             self._schedule_follow()
 
     def _on_selected_page_changed(self, *_args: object) -> None:
         container = self._current_container()
         if container is not None:
-            self.set_title(container.title or APP_NAME)
+            self.set_title(container.title or APP_TITLE)
             self._schedule_follow()
             container_pane = container.focused_pane
             if container_pane is not None:

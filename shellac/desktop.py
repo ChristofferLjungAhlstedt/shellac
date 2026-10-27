@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import APP_ID, APP_NAME
+from . import APP_ID, APP_NAME, APP_TITLE
 
 ICON_SOURCE = Path(__file__).parent / "resources" / "icons" / "hicolor" / "scalable" / "apps"
 ICON_FILE = f"{APP_ID}.svg"
@@ -51,7 +51,7 @@ def desktop_entry(command: list[str]) -> str:
 [Desktop Entry]
 Type=Application
 Version=1.5
-Name={APP_NAME}
+Name={APP_TITLE}
 GenericName=Terminal Emulator
 Comment=Terminal emulator with split panes, tabs and a file tree sidebar
 Exec={exec_line}

@@ -22,7 +22,7 @@ def parse(text: str) -> dict[str, str]:
 def test_entry_has_the_required_keys():
     entry = parse(desktop_entry(["/usr/bin/shellac"]))
     assert entry["Type"] == "Application"
-    assert entry["Name"] == "shellac"
+    assert entry["Name"] == "Shellac"
     assert entry["Exec"] == "/usr/bin/shellac"
     assert entry["Icon"] == APP_ID
     assert entry["Terminal"] == "false"
