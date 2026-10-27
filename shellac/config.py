@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from . import APP_NAME
-from .keybindings import DEFAULT_KEYBINDINGS, find_conflicts, normalize_accelerator
+from .keybindings import (
+    DEFAULT_KEYBINDINGS,
+    find_binding_conflicts,
+    normalize_accelerator,
+)
 
 
 @dataclass
@@ -99,6 +103,8 @@ class Config:
     appearance: AppearanceConfig = field(default_factory=AppearanceConfig)
     sidebar: SidebarConfig = field(default_factory=SidebarConfig)
     keybindings: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_KEYBINDINGS))
+    # Second, third... shortcut of an action; ``keybindings`` holds the first one.
+    extra_bindings: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass
@@ -233,31 +239,49 @@ def _build_section(name: str, cls: type, raw: Any, warnings: list[str]) -> Any:
     return instance
 
 
-def _build_keybindings(raw: Any, warnings: list[str]) -> dict[str, str]:
+def _build_keybindings(
+    raw: Any, warnings: list[str]
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Primary accelerator per action, plus any additional ones.
+
+    A value is one accelerator string, or a list of them: the first is the primary one.
+    """
     bindings = dict(DEFAULT_KEYBINDINGS)
+    extras: dict[str, list[str]] = {}
     if raw is None:
-        return bindings
+        return bindings, extras
     if not isinstance(raw, dict):
         warnings.append("[keybindings] must be a table; using defaults")
-        return bindings
+        return bindings, extras
 
-    for action, accel in raw.items():
+    for action, value in raw.items():
         if action not in DEFAULT_KEYBINDINGS:
             warnings.append(f"[keybindings] unknown action '{action}' ignored")
             continue
-        if not isinstance(accel, str) or normalize_accelerator(accel) is None:
-            warnings.append(
-                f"[keybindings] {action}: invalid accelerator {accel!r}; "
-                f"using default {DEFAULT_KEYBINDINGS[action]!r}"
-            )
+        values = value if isinstance(value, list) else [value]
+        if values == []:  # an explicitly empty list unbinds the action
+            bindings.pop(action, None)
             continue
-        bindings[action] = accel
+        valid = [v for v in values if isinstance(v, str) and normalize_accelerator(v) is not None]
+        if len(valid) != len(values) or not valid:
+            warnings.append(
+                f"[keybindings] {action}: invalid accelerator {value!r}; "
+                + (
+                    "ignoring the invalid entries"
+                    if valid
+                    else f"using default {DEFAULT_KEYBINDINGS[action]!r}"
+                )
+            )
+        if not valid:
+            continue
+        bindings[action] = valid[0]
+        if valid[1:]:
+            extras[action] = valid[1:]
 
-    for first, second in find_conflicts(bindings):
-        warnings.append(
-            f"[keybindings] '{first}' and '{second}' share the accelerator {bindings[first]!r}"
-        )
-    return bindings
+    everything = {a: [first, *extras.get(a, [])] for a, first in bindings.items()}
+    for first, second, accel in find_binding_conflicts(everything):
+        warnings.append(f"[keybindings] '{first}' and '{second}' share the accelerator {accel!r}")
+    return bindings, extras
 
 
 def parse_config(data: dict[str, Any]) -> LoadResult:
@@ -269,7 +293,8 @@ def parse_config(data: dict[str, Any]) -> LoadResult:
     for key in data:
         if key not in _SECTIONS and key != "keybindings":
             warnings.append(f"unknown section [{key}] ignored")
-    config = Config(**sections, keybindings=_build_keybindings(data.get("keybindings"), warnings))
+    bindings, extras = _build_keybindings(data.get("keybindings"), warnings)
+    config = Config(**sections, keybindings=bindings, extra_bindings=extras)
     return LoadResult(config=config, warnings=warnings)
 
 
