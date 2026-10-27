@@ -132,3 +132,28 @@ def test_gitignore_is_shown_by_default():
     from shellac.config import SidebarConfig
 
     assert ".gitignore" in SidebarConfig().always_show
+
+
+def test_a_list_gives_a_primary_and_extra_shortcuts():
+    result = parse_config({"keybindings": {"copy": ["<Ctrl><Alt>c", "<Ctrl>Insert"]}})
+    assert result.warnings == []
+    assert result.config.keybindings["copy"] == "<Ctrl><Alt>c"
+    assert result.config.extra_bindings == {"copy": ["<Ctrl>Insert"]}
+
+
+def test_invalid_entries_in_a_list_are_dropped_with_a_warning():
+    result = parse_config({"keybindings": {"copy": ["<Bogus>c", "<Ctrl>Insert"]}})
+    assert result.config.keybindings["copy"] == "<Ctrl>Insert"
+    assert any("copy" in w for w in result.warnings)
+
+
+def test_an_extra_shortcut_that_collides_with_another_action_warns():
+    result = parse_config({"keybindings": {"copy": ["<Ctrl><Shift>c", "<Ctrl><Shift>v"]}})
+    assert any("share the accelerator" in w for w in result.warnings)
+
+
+def test_an_empty_list_unbinds_the_action():
+    result = parse_config({"keybindings": {"copy": []}})
+    assert result.warnings == []
+    assert "copy" not in result.config.keybindings
+    assert "paste" in result.config.keybindings
