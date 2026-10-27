@@ -1,115 +1,43 @@
-# shellac
+<h1 align="center">shellac</h1>
 
-A good-looking Linux terminal emulator with fast pane splitting and a file tree sidebar.
-Built on GTK4, libadwaita and VTE; Python 3.11+.
+<p align="center">
+  A good-looking Linux terminal emulator with fast pane splitting<br>
+  and a file tree that follows you around.
+</p>
 
-Licensed under the GNU General Public License v3.0 or later (see `LICENSE`).
-Copyright (C) 2026 Christoffer Ljung Ahlstedt. Bundled third-party artwork is listed in
-`THIRD_PARTY_NOTICES.md`.
+<p align="center">
+  <img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue">
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-blue">
+  <img alt="GTK4 + libadwaita + VTE" src="https://img.shields.io/badge/GTK4-libadwaita-green">
+</p>
 
-> **Renamed from "paneterm".** If you used an earlier build, move your files once:
-> `mv ~/.config/paneterm ~/.config/shellac` and
-> `mv ~/.local/state/paneterm ~/.local/state/shellac`. Remove the old install with
-> `paneterm --uninstall-desktop` followed by `pipx uninstall paneterm`, then install shellac.
+![shellac with split panes and the file tree](docs/screenshots/splits-and-sidebar.png)
 
-## Status
+shellac is a terminal for people who live in splits. It is built on GTK4, libadwaita and
+VTE, so it looks at home on a modern Linux desktop and behaves like the terminal you already
+know, with a few things added.
 
-Built milestone by milestone from the development specification.
+## Features
 
-| Milestone | State |
-| --- | --- |
-| M1 Single terminal window | Done: themed window, VTE running your shell, copy/paste, config loading |
-| M2 Splits and tabs | Done: nested splits, close/collapse, directional focus, resize, pane zoom, tabs, working-directory inheritance |
-| M3 Config and themes | Done: five bundled themes, runtime switching, live config reload, system light/dark following, rebindable keys |
-| M4 File tree sidebar | Done: lazy tree, follow mode and pin, live updates, icons, activation actions, context menu, keyboard navigation, filter |
-| M5 Git integration and polish | Done: git status colors, `.gitignore` dimming/hiding, scrollback search, clickable URLs, font zoom, remembered window size |
-| M6 Packaging | Done: launcher entry and icon (`--install-desktop`), install steps per distro, screenshots |
+- **Splits and tabs.** Nest horizontal and vertical splits like Terminator, move focus by
+  direction, resize from the keyboard, zoom a single pane, and keep working directories when
+  you split.
+- **File tree sidebar.** A tree in the style of nvim-tree that follows the directory of the
+  focused pane. Git status colors, language icons, live updates, filtering, rename, trash and
+  a context menu, all from the keyboard or the mouse.
+- **Git aware.** Changed, added, untracked and conflicted files are colored and marked, and
+  ignored files are dimmed or hidden. Git runs off the main thread, so the window never stalls.
+- **Themes.** Five bundled themes, runtime switching with one key, your own themes as plain
+  TOML files, and optional following of the system light/dark setting.
+- **Live configuration.** Edit `config.toml` or a theme and every window updates at once.
+  A mistake never breaks a running window.
+- **Search and links.** Search the scrollback with highlighting, and Ctrl+click URLs.
+- **Configurable file actions.** Clicking a file can open your editor, run a command, run the
+  file, paste its path or open it with the desktop, per extension if you like.
+- **Remembers your layout.** Window size, sidebar visibility and width.
 
-## Keybindings
-
-All bindings use Ctrl+Shift or Ctrl+Alt, so they never collide with shell shortcuts.
-They are remappable in `[keybindings]`.
-
-| Action | Default |
-| --- | --- |
-| Split, new pane below (`split_down`) | Ctrl+Shift+O |
-| Split, new pane to the right (`split_right`) | Ctrl+Shift+E |
-| Close pane (`close_pane`) | Ctrl+Shift+W |
-| Zoom / unzoom pane (`zoom_pane`) | Ctrl+Shift+Z |
-| Move focus (`focus_left/right/up/down`) | Ctrl+Alt+Arrows |
-| Resize pane (`resize_left/right/up/down`) | Ctrl+Shift+Alt+Arrows |
-| New tab / next / previous | Ctrl+Shift+T / Ctrl+PageDown / Ctrl+PageUp |
-| Jump to tab 1..9 (`goto_tab_1`..) | Alt+1..9 |
-| Copy / paste | Ctrl+Shift+C / Ctrl+Shift+V |
-| Cycle theme (`cycle_theme`) | Ctrl+Shift+P |
-| Reload config (`reload_config`) | Ctrl+Shift+R |
-| Search the scrollback (`search`) | Ctrl+Shift+F |
-| Font zoom in / out / reset (`zoom_in/out/reset`) | Ctrl+plus / Ctrl+minus / Ctrl+0 |
-| Show / hide sidebar (`toggle_sidebar`) | Ctrl+Shift+B |
-| Focus the sidebar (`focus_sidebar`) | Ctrl+Alt+B |
-
-Ctrl+= and the keypad's + / - / 0 also zoom. Ctrl+click opens a URL in the output.
-
-If two actions end up with the same accelerator, a warning is logged and shown as a toast.
-
-## Install
-
-PyGObject, GTK4, libadwaita and VTE come from the distro, not from PyPI. Install those,
-then shellac itself with pipx, and add it to the application menu:
-
-```sh
-pipx install --system-site-packages .
-shellac --install-desktop      # launcher + icon for this user, no root needed
-```
-
-`--system-site-packages` is required so the isolated environment can see the distro's
-`python3-gi`. pipx cannot install a launcher or an icon by itself, which is why
-`--install-desktop` exists: it writes
-`~/.local/share/applications/io.github.shellac.Shellac.desktop` and the icon next to it.
-Log out and back in (or wait a moment) if the menu does not show it at once.
-
-| Distro | Packages |
-| --- | --- |
-| Kubuntu / Ubuntu / Debian | `sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-vte-3.91 librsvg2-common pipx` |
-| Fedora | `sudo dnf install python3-gobject gtk4 libadwaita vte291-gtk4 librsvg2 pipx` |
-| Arch | `sudo pacman -S python-gobject gtk4 libadwaita vte4 librsvg python-pipx` |
-
-The Debian/Ubuntu line is the one that has been used (it installed and ran on Kubuntu
-26.04 with Python 3.14); the Fedora and Arch names are from those distros' package lists and
-are **not verified**. If `apt` cannot find a package, search with `apt search vte | grep -i gtk4`.
-`librsvg2-common` provides the SVG loader the sidebar icons need.
-
-### Update and uninstall
-
-```sh
-pipx install --system-site-packages --force .   # update from a checkout
-shellac --uninstall-desktop                    # remove the launcher and icon
-pipx uninstall shellac
-```
-
-Your settings stay in `~/.config/shellac/` and `~/.local/state/shellac/`; delete those
-folders too for a clean removal.
-
-### Run from a checkout (no install)
-
-```sh
-python3 -m shellac             # from the project folder
-python3 -m shellac --debug     # with debug logging
-python3 -m pytest               # the unit tests (no display needed)
-```
-
-shellac is a single-instance application: starting it while it is running just brings the
-running window forward, so an installed copy can answer a launch meant for a checkout.
-Quit the installed one first.
-
-Automated checks ran with GTK 4.14, libadwaita 1.5, VTE 0.76 and Python 3.12 under Xvfb.
-Not yet tested on Wayland.
-
-## Screenshots
-
-Splits with the file tree (git status colors, an ignored file dimmed):
-
-![Splits and sidebar](docs/screenshots/splits-and-sidebar.png)
+<details>
+<summary>More screenshots</summary>
 
 Scrollback search:
 
@@ -119,224 +47,203 @@ A light theme (`one-light`):
 
 ![Light theme](docs/screenshots/theme-one-light.png)
 
-These were taken in a virtual display without a Nerd Font, so the terminal text uses the
-fallback monospace font.
+</details>
 
-## Working directory tracking (OSC 7)
+## Install
 
-Split panes and the sidebar need to know each shell's current directory. VTE learns it
-from the OSC 7 escape sequence, which not every zsh setup emits. Add this to `~/.zshrc`:
+shellac needs PyGObject, GTK4, libadwaita and VTE from your distribution (they are not on
+PyPI), then installs with pipx.
+
+**1. Install the system packages**
+
+| Distro | Command |
+| --- | --- |
+| Kubuntu / Ubuntu / Debian | `sudo apt install python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-vte-3.91 librsvg2-common pipx` |
+| Fedora | `sudo dnf install python3-gobject gtk4 libadwaita vte291-gtk4 librsvg2 pipx` |
+| Arch | `sudo pacman -S python-gobject gtk4 libadwaita vte4 librsvg python-pipx` |
+
+The Debian/Ubuntu line is tested on Kubuntu 26.04. The Fedora and Arch package names come
+from those distros' package lists and have not been verified; if one is not found, please
+open an issue.
+
+**2. Install shellac**
+
+From a clone of this repository:
+
+```sh
+pipx install --system-site-packages .
+shellac --install-desktop      # adds the launcher and icon for your user, no root needed
+```
+
+`--system-site-packages` lets pipx's isolated environment see the distribution's `python3-gi`.
+`--install-desktop` is needed because pipx cannot install a menu entry or icon by itself. If
+the entry does not show up in your application menu at once, log out and back in.
+
+Then start it from the menu or run `shellac`.
+
+### Update
+
+```sh
+git pull
+pipx install --system-site-packages --force .
+shellac --install-desktop
+```
+
+### Uninstall
+
+```sh
+shellac --uninstall-desktop
+pipx uninstall shellac
+```
+
+Your settings live in `~/.config/shellac/` and `~/.local/state/shellac/`; delete those too
+for a clean removal.
+
+## Quick start
+
+Everything uses Ctrl+Shift or Ctrl+Alt, so nothing collides with your shell's shortcuts.
+
+| Action | Keys |
+| --- | --- |
+| Split: new pane below / to the right | `Ctrl+Shift+O` / `Ctrl+Shift+E` |
+| Close pane | `Ctrl+Shift+W` |
+| Zoom or unzoom the pane | `Ctrl+Shift+Z` |
+| Move focus between panes | `Ctrl+Alt+Arrows` |
+| Resize the pane | `Ctrl+Shift+Alt+Arrows` |
+| New tab / next / previous | `Ctrl+Shift+T` / `Ctrl+PageDown` / `Ctrl+PageUp` |
+| Jump to tab 1 to 9 | `Alt+1` to `Alt+9` |
+| Copy / paste | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
+| Search the scrollback | `Ctrl+Shift+F` |
+| Font zoom in / out / reset | `Ctrl+plus` / `Ctrl+minus` / `Ctrl+0` |
+| Cycle theme | `Ctrl+Shift+P` |
+| Reload configuration | `Ctrl+Shift+R` |
+| Show or hide the sidebar | `Ctrl+Shift+B` |
+| Move keyboard focus to the sidebar | `Ctrl+Alt+B` |
+
+All of these can be remapped under `[keybindings]` in the config file (see
+[Configuration](#configuration)).
+
+## The file tree
+
+The sidebar shows the directory of the pane you are working in and follows you as you `cd`.
+The pin button locks it to one place. Use the mouse, or press `Ctrl+Alt+B` to move into it:
+
+| Key | Does |
+| --- | --- |
+| `Up` / `Down` | move |
+| `Right` or `l` / `Left` or `h` | expand / collapse (or go to the parent) |
+| `Enter` | open the file, or `cd` into the directory |
+| `/` | filter by name |
+| `H` | toggle hidden files |
+| `I` | toggle hiding of git-ignored files |
+| `p` | pin or unpin the root |
+| `-` or `Backspace` | go to the parent directory |
+| `F2` / `Delete` | rename / move to trash |
+| `F5` | refresh |
+| `Menu` or `Shift+F10` | context menu |
+| `Esc` | back to the terminal |
+
+To change the width, drag the divider, or press `Ctrl+Shift+Alt+Left/Right` while the tree
+has focus. Git status uses `M` modified, `A` added, `?` untracked, `D` deleted and `!`
+conflicted, with the theme's colors; directories show a dot if anything inside has changed.
+
+What a click on a file does is configurable. The default opens `$VISUAL` / `$EDITOR` in a new
+split. See [file activation](docs/configuration.md#sidebar-file-activation) for running a
+command, running the file, or choosing the action per extension.
+
+## Configuration
+
+Settings live in `~/.config/shellac/config.toml`. Every setting has a default, so the file
+can be tiny, or missing. A short example:
+
+```toml
+[appearance]
+theme = "tokyo-night"
+font_family = "JetBrainsMono Nerd Font"
+font_size = 12
+opacity = 0.95
+
+[sidebar]
+on_file_activate = "editor_split"   # or: editor_tab, command_split, run, paste_path, ...
+file_type_icons = true
+
+[sidebar.open_with]
+sh = "bash {path}"
+
+[keybindings]
+split_right = "<Ctrl><Shift>d"
+```
+
+Saving the file applies the change straight away. The full list of settings, the theme
+format and the live-reload rules are in the **[configuration reference](docs/configuration.md)**.
+
+### Themes
+
+Bundled: `catppuccin-mocha` (default), `tokyo-night`, `gruvbox-dark`, `nord` and `one-light`.
+Press `Ctrl+Shift+P` to cycle through them. To make your own, put a `.toml` file in
+`~/.config/shellac/themes/`.
+
+### Fonts
+
+shellac uses `font_family` from the config and falls back to common Nerd Fonts and then to
+the system monospace font. For prompt themes with icons (Powerlevel10k, starship), install a
+[Nerd Font](https://www.nerdfonts.com/) and set it as `font_family`.
+
+## Shell integration
+
+Splits and the sidebar need to know each shell's current directory. VTE learns it from the
+OSC 7 escape sequence, which some zsh setups do not emit. If new splits open in the wrong
+directory or the sidebar does not follow your `cd`, add the snippet to your `~/.zshrc`:
 
 ```sh
 shellac --print-shell-integration >> ~/.zshrc
 ```
 
-The snippet percent-encodes the path, so directories with spaces or non-ASCII names work.
-It is three lines rather than the one line the spec asks for; a plain one-liner produces
-invalid URIs for such paths. Without it, shellac falls back to reading
-`/proc/<pid>/cwd`, which also works but cannot see through nested shells.
+Without it, shellac falls back to reading `/proc/<pid>/cwd`, which also works but cannot see
+through nested shells such as `ssh`.
 
-## Configuration
+## Troubleshooting
 
-`$XDG_CONFIG_HOME/shellac/config.toml` (default `~/.config/shellac/config.toml`).
-Every setting has a default, and a missing or partial file is fine. An invalid value
-logs a warning, shows one toast, and falls back to its default; it never crashes.
-User themes go in `~/.config/shellac/themes/*.toml` and override bundled ones with the
-same file name. `shellac --help` lists the command-line flags.
-
-```toml
-[general]
-shell = ""               # empty = $SHELL, then /bin/zsh, then /bin/bash
-login_shell = true       # start the shell with -l
-scrollback_lines = 10000
-clickable_urls = true    # Ctrl+click opens URLs
-search_case_sensitive = false
-search_wrap_around = true
-
-[window]
-width = 1000
-height = 640
-
-[panes]
-resize_step = 40         # pixels moved by one keyboard resize
-
-[tabs]
-autohide = true          # hide the tab bar while only one tab is open
-
-[appearance]
-theme = "catppuccin-mocha"
-follow_system_scheme = false             # true: pick dark_theme or light_theme by the system
-dark_theme = "catppuccin-mocha"
-light_theme = "one-light"
-font_family = "JetBrainsMono Nerd Font"   # falls back to FiraCode/Iosevka NF, then Monospace
-font_size = 12
-opacity = 0.95           # terminal background only, never the text
-padding = 8
-cursor_shape = "block"   # block | ibeam | underline
-cursor_blink = false
-zoom_scope = "pane"      # pane | window: what Ctrl+plus / Ctrl+minus resize
-zoom_step = 0.1
-
-[sidebar]
-visible = true           # first-launch default; afterwards the remembered state wins
-width = 260              # same
-follow_cwd = true        # the root follows the focused pane's directory
-show_hidden = false      # H toggles it while the tree is focused
-hide_gitignored = false  # true hides ignored entries; false dims them (I toggles)
-git_status = true        # color and mark changed files (needs git)
-on_file_activate = "editor_split"   # editor_split | editor_tab | command_split | command_tab
-                                    # | run | paste_path | desktop_open
-file_command = ""        # for command_*: argv template, e.g. "bat --paging=always {path}"
-keep_pane_open = true    # command_* and run: wait for Enter after the command exits
-always_show = [".gitignore"]        # dotfiles shown even while show_hidden = false
-file_type_icons = true   # language/file-type logos in the tree (false = plain icons)
-on_dir_activate = "cd"              # cd | reroot
-editor = ""              # empty = $VISUAL, then $EDITOR, then nano/vim/vi (may include arguments)
-editor_split_direction = "right"    # right | down
-reveal_in_root = true    # a cd inside the shown tree expands to it instead of re-rooting
-indent = 16              # pixels per tree level
-
-[sidebar.open_with]      # per-extension override of the activation command
-# py = "vim {path}"
-# sh = "bash {path}"
-
-[keybindings]
-copy = "<Ctrl><Shift>c"
-paste = "<Ctrl><Shift>v"
-```
-
-Keybindings for actions that are not implemented are accepted and validated but not bound.
-
-## File tree sidebar
-
-Ctrl+Shift+B shows or hides it, Ctrl+Alt+B moves keyboard focus into it. Whether it is
-visible and how wide it is are remembered in `~/.local/state/shellac/state.json`, which
-wins over `[sidebar] visible/width` (those are only the first-launch defaults). Your
-config file is never rewritten.
-
-- **Resizing**: drag the divider, or press Ctrl+Shift+Alt+Left/Right while the tree has focus
-  (same keys as pane resizing; the step is `[panes] resize_step`).
-- **Follow mode** (default): the tree follows the focused pane's directory, debounced
-  by 150 ms. If the directory is inside the tree, it is expanded and scrolled to instead of
-  re-rooting. The pin button locks the root for this window.
-- **Live updates**: every expanded directory is watched; create, delete and rename events
-  update the tree without a reload. Collapsing a directory releases its watchers.
-- **Keys** (tree focused): Up/Down move, Right or `l` expand, Left or `h` collapse (or go
-  to the parent), Enter open, `H` toggle hidden files, `/` filter by name, F2 rename,
-  Delete move to trash, Menu or Shift+F10 context menu, Escape back to the terminal.
-- **Mouse**: a click expands or collapses a directory; a double click activates it. Right
-  click opens the context menu (copy path, copy relative path, reveal in file manager,
-  new file, new folder, rename, move to trash, open in new tab).
-- **Activation**: a directory runs `cd` in the focused pane, a file opens `$EDITOR` in a new
-  split. The `cd` is only typed when the shell is at a prompt; otherwise a toast says what is
-  running. Paths are shell-quoted.
-- **Git** (inside a repository): changed files are colored and marked (`M` modified,
-  `A` added, `?` untracked, `D` deleted, `!` conflicted); a directory shows `•` and the most
-  important status of anything below it. Ignored entries are dimmed, or hidden with
-  `hide_gitignored` (`I` toggles it for the session). Colors come from the theme's palette.
-  `git` runs on its own thread with `GIT_OPTIONAL_LOCKS=0`, so it never blocks the window or
-  takes the index lock, and it re-runs about 300 ms after files change, are saved, or after
-  `git add` / `commit` / `checkout` in a shell. More keys: `p` pin, `-` or Backspace go to
-  the parent, F5 refresh.
-- **File activation** is configurable with `on_file_activate`: open `$EDITOR` in a split or
-  tab, run `file_command` (placeholders `{path}`, `{dir}`, `{name}`; run as argv, never through
-  a shell), `run` the file itself (must be executable, otherwise a toast explains), paste the
-  quoted path, or hand it to the desktop. `[sidebar.open_with]` maps an extension to its own
-  command and wins over the mode. With `keep_pane_open` the pane stays until you press Enter,
-  so output can be read.
-- **File-type icons**: ~130 extensions and ~25 well-known file names (Dockerfile, Makefile,
-  ...) get a language logo; set `file_type_icons = false` for plain icons. The artwork is from
-  Material Icon Theme (MIT), see `THIRD_PARTY_NOTICES.md`. `.gitignore` and anything in
-  `always_show` is treated like a regular file even when hidden files are off.
-- **Icons** are bundled symbolic SVGs, so no glyph font is needed. They require the SVG
-  pixbuf loader (`librsvg2-common`), which a desktop install already has.
-
-## Themes
-
-Bundled: `catppuccin-mocha` (default), `tokyo-night`, `gruvbox-dark`, `nord` and
-`one-light`. **Ctrl+Shift+P** cycles through them, recoloring every pane, tab and the
-window chrome at once. Set one permanently with `theme = "nord"`.
-
-To add your own, drop a `.toml` file into `~/.config/shellac/themes/` (the folder is
-created on first start). Copy one of the bundled files from the installed package as a
-template: `terminal` colors, a 16-entry `palette`, and `ui` colors for the chrome. A user
-theme with the same file name as a bundled one replaces it. Theme files are reloaded
-live, so you can edit one and watch it update.
-
-With `follow_system_scheme = true`, `dark_theme` or `light_theme` is chosen by the
-desktop's dark/light preference and changes when that does.
-
-## Live reload
-
-The config file and the themes folder are watched. Saving either applies the change to
-all open windows and panes within a moment, including fonts, colors, opacity, padding,
-the tab bar and keybindings. Ctrl+Shift+R reloads on demand.
-
-- A mistake never breaks a running window: an invalid value, an unknown theme or broken
-  TOML logs a warning, shows one toast, and uses the default for that value.
-- A theme picked with Ctrl+Shift+P lasts until the config is reloaded or edited. While
-  following the system scheme, cycling pauses the following until the next reload.
-- Settings that only matter at creation (`shell`, `login_shell`, window size) apply to
-  new panes and tabs, not to shells that are already running.
-
-## Design decisions
-
-Where the spec was ambiguous, the simplest behavior was chosen:
-
-- **Login shell.** The shell is started with `-l` (FR-1 asks for a login shell). Set
-  `login_shell = false` to turn that off.
-- **TERM and COLORTERM.** Always set to `xterm-256color` and `truecolor` for the child.
-  FR-2's "unless the user overrides them" has no config key yet, because inheriting TERM
-  from whichever terminal launched shellac would advertise the wrong capabilities.
-- **Window size.** `[window] width/height` was added so there are no magic constants in
-  widget code. Persisting the size between launches belongs to M5.
-
-- **Light theme.** `one-light` rather than Catppuccin Latte: Latte's yellow and magenta fall
-  below 2.5:1 contrast on its background. A unit test keeps every bundled theme readable
-  (body text at least 7:1, colored ANSI entries at least 2.5:1).
-- **Config folders.** shellac creates `~/.config/shellac/` and its `themes/` folder on
-  startup (not the config file itself). Directories are watched instead of the file, so
-  editors that save by renaming a temp file over it are handled.
-- **Split naming.** `split_down` puts the new pane below, `split_right` puts it beside,
-  matching Terminator. Inside the code these are `Axis.VERTICAL` / `Axis.HORIZONTAL`
-  (GTK's orientation of the children), which is the reverse of the everyday wording.
-- **Focus indicator.** `focus_indicator = "border"` draws a 1 px accent outline over the
-  pane, so it never changes the pane's size. It only shows while several panes are visible.
-- **Remote shells.** Inside `ssh`, the remote shell's OSC 7 reports its own path. A URI
-  naming another host is ignored, so a new split opens in a local directory instead.
-- **Close behavior.** Closing a pane sends its shell SIGHUP. There is no "confirm close
-  while a command is running" prompt yet (`confirm_close_running` is parsed but unused).
-- **Known cosmetic warning.** Closing a pane programmatically in an unfocused window can log
-  a GTK `gtk_paned_set_focus_child` warning. It did not appear with real keypresses in a
-  focused window, and has no visible effect.
-
-- **Double click on a directory.** The first click already expanded it, so a double click
-  expands and then `cd`s (or re-roots). It does not toggle twice.
-- **Typed text at the prompt.** `cd` is typed after whatever is already on the command line,
-  as the spec's idle check cannot see a half-typed line.
-- **Unreachable root.** If the root directory disappears the tree moves to the nearest
-  directory that still exists. A directory still open in a shell sends no delete event, so
-  this is also checked once a second.
-- **Filter** only applies to directories that are already loaded; it never scans the disk.
-- **Git status and `.gitignore`** (`hide_gitignored`) arrive with M5.
-
-- **Window size.** The size and maximized state are remembered in the state file and win over
-  `[window] width/height`, which only set the first-launch size.
-- **Search** uses VTE's own search: the match is highlighted and selected in the terminal.
-  Enter / Shift+Enter go to the next / previous match, Escape closes the bar. The text is
-  matched literally, not as a regular expression.
-- **URL clicking** only opens `http`, `https`, `ftp(s)`, `file` and `mailto`, also for OSC 8
-  hyperlinks, so a program cannot make Ctrl+click launch an arbitrary protocol handler.
-  A trailing `.` `,` `)` is not treated as part of the link, so a URL that itself ends in
-  `)` loses it.
-- **Font zoom** is per pane by default; `zoom_scope = "window"` zooms every pane and new ones.
+| Problem | Try |
+| --- | --- |
+| Icons in the sidebar are blank | install `librsvg2-common` (the SVG loader) |
+| No menu entry after install | run `shellac --install-desktop`, then log out and back in |
+| New splits open in `~` | add the [shell integration](#shell-integration) |
+| Prompt shows boxes instead of symbols | use a Nerd Font as `font_family` |
+| Starting it again does nothing | shellac is single-instance: it brings the running window forward |
+| Want debug output | `shellac --debug` |
 
 ## Development
 
 ```sh
-python3 -m pytest        # needs python3-pytest, or: pip install -e '.[dev]'
-ruff check . && ruff format --check .
+git clone https://github.com/ChristofferLjungAhlstedt/shellac.git shellac && cd shellac
+python3 -m venv --system-site-packages .venv    # the system packages provide PyGObject
+. .venv/bin/activate
+pip install -e '.[dev]'
+
+pytest -q                # unit tests, no display needed
+ruff check .             # lint
+python3 -m shellac       # run from the checkout
 ```
 
-The config, theme, keybinding and shell-resolution modules do not import GTK, so their
-tests run without a display. The pane tree (M2) will follow the same rule.
+The configuration, theme, keybinding, pane-tree and file-tree model code does not import
+GTK, so it is covered by plain unit tests. The window and widgets are checked by hand and with
+scripted runs under Xvfb. If you installed shellac with pipx, quit it first, because a second
+instance just raises the running one.
+
+Design decisions, milestone history and testing notes are in
+[docs/design-notes.md](docs/design-notes.md). The project follows these rules: the pane layout
+is a plain data structure kept separate from GTK, nothing blocks the GTK main loop, every
+user-visible setting is in the config file, and code is type-hinted and ruff-clean.
+
+Known limits: not yet tested on Wayland; the optional "confirm before closing a running
+shell" prompt is not built.
+
+## License
+
+shellac is free software under the **GNU General Public License v3.0 or later**; see
+[`LICENSE`](LICENSE). Copyright (C) 2026 Christoffer Ljung Ahlstedt.
+
+The file-type icons come from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)
+(MIT) and the logos remain trademarks of their owners; see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
