@@ -2,7 +2,7 @@ import os
 import subprocess
 import sys
 
-from paneterm.shell import cwd_from_uri, read_proc_cwd
+from shellac.shell import cwd_from_uri, read_proc_cwd
 
 HOSTS = {"mybox"}
 

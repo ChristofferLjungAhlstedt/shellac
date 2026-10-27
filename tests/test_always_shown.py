@@ -1,4 +1,4 @@
-from paneterm.file_tree_model import Entry, TreeModel
+from shellac.file_tree_model import Entry, TreeModel
 
 
 class Quiet:

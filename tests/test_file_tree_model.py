@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from paneterm.file_tree_model import (
+from shellac.file_tree_model import (
     INCREMENTAL_LIMIT,
     Entry,
     Node,

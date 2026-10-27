@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from paneterm.git_status import (
+from shellac.git_status import (
     ADDED,
     CONFLICTED,
     DELETED,

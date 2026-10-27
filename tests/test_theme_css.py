@@ -1,5 +1,5 @@
-from paneterm.config import AppearanceConfig
-from paneterm.theme import (
+from shellac.config import AppearanceConfig
+from shellac.theme import (
     BUNDLED_THEMES_DIR,
     GIT_STATUS_PALETTE_INDEX,
     generate_css,

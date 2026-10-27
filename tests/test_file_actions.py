@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from paneterm.config import SidebarConfig, parse_config
-from paneterm.file_actions import (
+from shellac.config import SidebarConfig, parse_config
+from shellac.file_actions import (
     HOLD_SCRIPT,
     Plan,
     Problem,

@@ -2,7 +2,7 @@ import re
 
 import pytest
 
-from paneterm.links import URL_PATTERN, is_openable
+from shellac.links import URL_PATTERN, is_openable
 
 FIND = re.compile(URL_PATTERN)
 

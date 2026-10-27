@@ -5,7 +5,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from paneterm.terminal_actions import (
+from shellac.terminal_actions import (
     cd_command,
     editor_argv,
     foreground_name,

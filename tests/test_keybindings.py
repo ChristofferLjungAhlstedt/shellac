@@ -1,4 +1,4 @@
-from paneterm.keybindings import DEFAULT_KEYBINDINGS, find_conflicts, normalize_accelerator
+from shellac.keybindings import DEFAULT_KEYBINDINGS, find_conflicts, normalize_accelerator
 
 
 def test_normalization_ignores_modifier_order_alias_and_case():

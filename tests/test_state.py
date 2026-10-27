@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from paneterm.state import UiState, load_state, save_state, state_path
+from shellac.state import UiState, load_state, save_state, state_path
 
 
 def test_missing_file_means_no_state(tmp_path: Path):
@@ -49,7 +49,7 @@ def test_save_failure_is_reported_not_raised(tmp_path: Path):
 
 def test_state_path_honours_xdg_state_home(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path))
-    assert state_path() == tmp_path / "paneterm" / "state.json"
+    assert state_path() == tmp_path / "shellac" / "state.json"
 
 
 def test_save_leaves_no_temporary_file_behind(tmp_path: Path):

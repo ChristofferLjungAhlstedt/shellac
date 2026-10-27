@@ -1,6 +1,6 @@
 import pytest
 
-from paneterm.pane_tree import (
+from shellac.pane_tree import (
     MAX_RATIO,
     MIN_RATIO,
     Axis,

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from paneterm.shell import (
+from shellac.shell import (
     COLORTERM_VALUE,
     LAST_RESORT_SHELL,
     TERM_VALUE,

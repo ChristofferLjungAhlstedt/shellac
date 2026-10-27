@@ -1,4 +1,4 @@
-from paneterm.shell_integration import ZSH_SNIPPET
+from shellac.shell_integration import ZSH_SNIPPET
 
 
 def test_snippet_starts_with_real_zsh_code():

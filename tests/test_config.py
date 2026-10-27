@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from paneterm.config import Config, config_path, load_config, parse_config
-from paneterm.keybindings import DEFAULT_KEYBINDINGS
+from shellac.config import Config, config_path, load_config, parse_config
+from shellac.keybindings import DEFAULT_KEYBINDINGS
 
 
 def test_missing_file_gives_defaults_without_warnings(tmp_path: Path):
@@ -109,11 +109,11 @@ def test_defaults_are_not_shared_between_instances():
 
 def test_config_path_honours_xdg_config_home(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    assert config_path() == tmp_path / "paneterm" / "config.toml"
+    assert config_path() == tmp_path / "shellac" / "config.toml"
 
 
 def test_list_and_table_options_are_validated_and_copied():
-    from paneterm.config import SidebarConfig, parse_config
+    from shellac.config import SidebarConfig, parse_config
 
     result = parse_config({"sidebar": {"always_show": [".env", ".gitignore"]}})
     assert result.config.sidebar.always_show == [".env", ".gitignore"]
@@ -129,6 +129,6 @@ def test_list_and_table_options_are_validated_and_copied():
 
 
 def test_gitignore_is_shown_by_default():
-    from paneterm.config import SidebarConfig
+    from shellac.config import SidebarConfig
 
     assert ".gitignore" in SidebarConfig().always_show
