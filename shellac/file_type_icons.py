@@ -5,14 +5,14 @@ The data below picks icons from the "Material Icon Theme" set (MIT license, see
 their respective owners and are used here only to tell file types apart.
 
 GTK-free. To add a type, copy its SVG into ``resources/icons/hicolor/scalable/mimetypes`` as
-``paneterm-ft-<name>.svg`` and add a line to a table.
+``shellac-ft-<name>.svg`` and add a line to a table.
 """
 
 from __future__ import annotations
 
 import os
 
-ICON_PREFIX = "paneterm-ft-"
+ICON_PREFIX = "shellac-ft-"
 
 # Lower-case extension (without the dot) -> icon name.
 EXTENSION_ICONS: dict[str, str] = {

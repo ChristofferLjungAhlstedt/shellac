@@ -48,7 +48,7 @@ class MainWindow(Adw.ApplicationWindow):
         )
         if saved.window_maximized:
             self.maximize()
-        self.add_css_class("paneterm")
+        self.add_css_class("shellac")
         self._config = config
         self._theme = theme
         self._containers: dict[Adw.TabPage, PaneContainer] = {}
@@ -77,13 +77,13 @@ class MainWindow(Adw.ApplicationWindow):
         new_tab_button = Gtk.Button(tooltip_text="New tab")
         # Fall back to a text "+" if the bundled icon cannot be found (a stale install),
         # so the button is never invisible.
-        if Gtk.IconTheme.get_for_display(self.get_display()).has_icon("paneterm-plus-symbolic"):
-            new_tab_button.set_icon_name("paneterm-plus-symbolic")
+        if Gtk.IconTheme.get_for_display(self.get_display()).has_icon("shellac-plus-symbolic"):
+            new_tab_button.set_icon_name("shellac-plus-symbolic")
         else:
             new_tab_button.set_label("+")
         new_tab_button.set_action_name("win.new_tab")
         sidebar_button = Gtk.Button(
-            icon_name="paneterm-sidebar-symbolic", tooltip_text="Toggle sidebar"
+            icon_name="shellac-sidebar-symbolic", tooltip_text="Toggle sidebar"
         )
         sidebar_button.set_action_name("win.toggle_sidebar")
         header = Adw.HeaderBar()

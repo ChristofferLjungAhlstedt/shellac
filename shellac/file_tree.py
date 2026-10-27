@@ -36,7 +36,7 @@ log = logging.getLogger(__name__)
 ICONS_DIR = Path(__file__).parent / "resources" / "icons"
 SCAN_THREADS = 4
 EVENT_DEBOUNCE_MS = 100  # wait this long after the last file system event before re-listing
-CSS_CLASS = "paneterm-sidebar"
+CSS_CLASS = "shellac-sidebar"
 GIT_STATE_FILES = frozenset({"index", "HEAD", "packed-refs", "MERGE_HEAD"})
 GIT_DEBOUNCE_MS = 300  # wait for a burst of changes to settle before asking git again
 GIT_STATUSES = tuple(MARKERS)
@@ -70,7 +70,7 @@ class RowItem(GObject.Object):
 class _Row(Gtk.Box):
     def __init__(self) -> None:
         super().__init__(spacing=4)
-        self.add_css_class("paneterm-row")
+        self.add_css_class("shellac-row")
         self.spacer = Gtk.Box()
         self.arrow = Gtk.Image(pixel_size=12)
         self.icon = Gtk.Image(pixel_size=16)
@@ -97,13 +97,13 @@ class _Row(Gtk.Box):
         self.spacer.set_size_request(max(node.depth, 0) * indent, -1)
         if entry.is_dir:
             self.arrow.set_from_icon_name(
-                "paneterm-chevron-down-symbolic"
+                "shellac-chevron-down-symbolic"
                 if node.expanded
-                else "paneterm-chevron-right-symbolic"
+                else "shellac-chevron-right-symbolic"
             )
             self.arrow.set_opacity(1.0)
         else:
-            self.arrow.set_from_icon_name("paneterm-chevron-right-symbolic")
+            self.arrow.set_from_icon_name("shellac-chevron-right-symbolic")
             self.arrow.set_opacity(0.0)
         self.icon.set_from_icon_name(icon_name(entry, expanded=node.expanded, logos=logos))
         text = entry.name
@@ -195,10 +195,10 @@ class FileTree(Gtk.Box):
         self._monitors: dict[Node, tuple[Gio.FileMonitor, int]] = {}
         self._refresh_timers: dict[Node, int] = {}
         self._pool = ThreadPoolExecutor(
-            max_workers=SCAN_THREADS, thread_name_prefix="paneterm-scan"
+            max_workers=SCAN_THREADS, thread_name_prefix="shellac-scan"
         )
         # Git can be slow in a big repository; its own thread keeps directory scans quick.
-        self._git_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="paneterm-git")
+        self._git_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="shellac-git")
 
         self.model = TreeModel(_Bridge(self), show_hidden=config.show_hidden)
         self.model.hidden_by = self._is_hidden_by_git
@@ -214,21 +214,21 @@ class FileTree(Gtk.Box):
 
     def _build_header(self) -> None:
         header = Gtk.Box(spacing=2)
-        header.add_css_class("paneterm-sidebar-header")
+        header.add_css_class("shellac-sidebar-header")
         self._root_label = Gtk.Label(xalign=0.0, hexpand=True, ellipsize=2)  # MIDDLE
         self._root_label.add_css_class("heading")
         header.append(self._root_label)
 
-        self._up_button = self._button("paneterm-up-symbolic", "Parent directory", self.go_up)
+        self._up_button = self._button("shellac-up-symbolic", "Parent directory", self.go_up)
         self._hidden_button = Gtk.ToggleButton(
-            icon_name="paneterm-eye-symbolic",
+            icon_name="shellac-eye-symbolic",
             tooltip_text="Show hidden files (H)",
             active=self._config.show_hidden,
         )
         self._hidden_button.add_css_class("flat")
         self._hidden_button.connect("toggled", lambda b: self.set_show_hidden(b.get_active()))
         self._pin_button = Gtk.ToggleButton(
-            icon_name="paneterm-pin-symbolic", tooltip_text="Pin the tree to this directory"
+            icon_name="shellac-pin-symbolic", tooltip_text="Pin the tree to this directory"
         )
         self._pin_button.add_css_class("flat")
         self._pin_button.connect("toggled", self._pin_toggled)
@@ -257,7 +257,7 @@ class FileTree(Gtk.Box):
         self._list = Gtk.ListView(
             model=self._selection, factory=factory, single_click_activate=False
         )
-        self._list.add_css_class("paneterm-tree")
+        self._list.add_css_class("shellac-tree")
         self._list.connect("activate", self._row_activated)
 
         keys = Gtk.EventControllerKey()

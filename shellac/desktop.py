@@ -1,7 +1,7 @@
-"""Install the launcher entry and icon so paneterm shows up in the application menu (M6).
+"""Install the launcher entry and icon so shellac shows up in the application menu (M6).
 
 pipx and pip install Python packages only; they cannot put a ``.desktop`` file or an icon
-where the desktop looks for them. ``paneterm --install-desktop`` does that for the current
+where the desktop looks for them. ``shellac --install-desktop`` does that for the current
 user (``~/.local/share``), and ``--uninstall-desktop`` removes it again. GTK-free.
 """
 

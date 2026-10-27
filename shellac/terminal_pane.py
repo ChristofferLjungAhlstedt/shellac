@@ -38,7 +38,7 @@ MAX_FONT_SCALE = 5.0
 PCRE2_MULTILINE = 0x00000400  # VTE requires this flag on match regexes
 
 DEFAULT_TITLE = "Terminal"
-PANE_CSS_CLASS = "paneterm-pane"
+PANE_CSS_CLASS = "shellac-pane"
 
 _CURSOR_SHAPES = {
     "block": Vte.CursorShape.BLOCK,

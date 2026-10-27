@@ -36,7 +36,7 @@ from .theme import Theme  # noqa: E402
 
 log = logging.getLogger(__name__)
 
-MULTI_CSS_CLASS = "paneterm-multi"  # on the container while more than one pane is visible
+MULTI_CSS_CLASS = "shellac-multi"  # on the container while more than one pane is visible
 FOCUSED_CSS_CLASS = "focused"  # on the focused pane's widget
 
 _ORIENTATION = {

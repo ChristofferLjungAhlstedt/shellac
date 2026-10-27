@@ -203,11 +203,11 @@ def generate_css(theme: Theme, appearance: AppearanceConfig) -> str:
 @define-color sidebar_bg_color {theme.sidebar_background};
 @define-color sidebar_fg_color {theme.sidebar_foreground};
 
-window.paneterm {{
+window.shellac {{
   background-color: {window_bg};
 }}
 
-window.paneterm headerbar {{
+window.shellac headerbar {{
   background-color: {theme.tabbar_background};
   color: {theme.foreground};
   box-shadow: none;
@@ -239,40 +239,40 @@ GIT_STATUS_PALETTE_INDEX = {
 
 def _git_status_css(theme: Theme) -> str:
     return "\n".join(
-        f".paneterm-sidebar .git-{name} label {{ color: {theme.palette[index]}; }}"
+        f".shellac-sidebar .git-{name} label {{ color: {theme.palette[index]}; }}"
         for name, index in GIT_STATUS_PALETTE_INDEX.items()
     )
 
 
 def _sidebar_css(theme: Theme) -> str:
     return f"""
-.paneterm-sidebar {{
+.shellac-sidebar {{
   background-color: {theme.sidebar_background};
   color: {theme.sidebar_foreground};
 }}
-.paneterm-sidebar listview, .paneterm-sidebar .paneterm-tree {{
+.shellac-sidebar listview, .shellac-sidebar .shellac-tree {{
   background: transparent;
   color: {theme.sidebar_foreground};
 }}
-.paneterm-sidebar .paneterm-tree > row {{
+.shellac-sidebar .shellac-tree > row {{
   padding: 1px 4px;
   min-height: 24px;
   border-radius: 4px;
 }}
-.paneterm-sidebar .paneterm-tree > row:hover {{
+.shellac-sidebar .shellac-tree > row:hover {{
   background-color: {_rgba(theme.sidebar_foreground, 0.08)};
 }}
-.paneterm-sidebar .paneterm-tree > row:selected {{
+.shellac-sidebar .shellac-tree > row:selected {{
   background-color: {_rgba(theme.accent, 0.35)};
   color: {theme.sidebar_foreground};
 }}
-.paneterm-sidebar .hidden-entry {{ opacity: 0.6; }}
-.paneterm-sidebar .ignored-entry {{ opacity: 0.45; }}
-.paneterm-sidebar .git-marker {{ font-size: 0.85em; font-weight: bold; }}
+.shellac-sidebar .hidden-entry {{ opacity: 0.6; }}
+.shellac-sidebar .ignored-entry {{ opacity: 0.45; }}
+.shellac-sidebar .git-marker {{ font-size: 0.85em; font-weight: bold; }}
 {_git_status_css(theme)}
-.paneterm-sidebar .error-entry label {{ font-style: italic; opacity: 0.7; }}
-.paneterm-sidebar-header {{ padding: 4px 6px; }}
-.paneterm-search {{
+.shellac-sidebar .error-entry label {{ font-style: italic; opacity: 0.7; }}
+.shellac-sidebar-header {{ padding: 4px 6px; }}
+.shellac-search {{
   background-color: {theme.sidebar_background};
   color: {theme.sidebar_foreground};
   border: 1px solid {theme.divider};
@@ -280,8 +280,8 @@ def _sidebar_css(theme: Theme) -> str:
   padding: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }}
-.paneterm-search entry, .paneterm-search button {{ color: {theme.sidebar_foreground}; }}
-.paneterm-sidebar button, .paneterm-sidebar entry, .paneterm-sidebar image {{
+.shellac-search entry, .shellac-search button {{ color: {theme.sidebar_foreground}; }}
+.shellac-sidebar button, .shellac-sidebar entry, .shellac-sidebar image {{
   color: {theme.sidebar_foreground};
 }}
 """
@@ -292,14 +292,14 @@ def _focus_indicator_css(theme: Theme, appearance: AppearanceConfig) -> str:
     if appearance.focus_indicator == "border":
         # An outline is drawn over the content and never changes the pane's size.
         return f"""
-.paneterm-multi .paneterm-pane.focused {{
+.shellac-multi .shellac-pane.focused {{
   outline: 1px solid {theme.accent};
   outline-offset: -1px;
 }}
 """
     if appearance.focus_indicator == "dim":
         return """
-.paneterm-multi .paneterm-pane:not(.focused) {
+.shellac-multi .shellac-pane:not(.focused) {
   opacity: 0.7;
 }
 """

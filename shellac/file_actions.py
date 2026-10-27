@@ -83,7 +83,7 @@ def build_argv(
 
 def hold_open(argv: list[str]) -> list[str]:
     """Wrap ``argv`` so the pane waits for Enter after the command ends."""
-    return ["/bin/sh", "-c", HOLD_SCRIPT, "paneterm", *argv]
+    return ["/bin/sh", "-c", HOLD_SCRIPT, "shellac", *argv]
 
 
 def plan_file_action(

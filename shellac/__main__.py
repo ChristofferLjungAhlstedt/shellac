@@ -1,4 +1,4 @@
-"""Entry point: ``paneterm`` or ``python -m paneterm``."""
+"""Entry point: ``shellac`` or ``python -m shellac``."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--install-desktop",
         action="store_true",
-        help="add paneterm to the application menu (launcher and icon, for this user) and exit",
+        help="add shellac to the application menu (launcher and icon, for this user) and exit",
     )
     parser.add_argument(
         "--uninstall-desktop",
@@ -39,7 +39,7 @@ _DARK_THEME_WARNING = "gtk-application-prefer-dark-theme"
 
 
 def _quiet_known_warnings() -> None:
-    """Drop one libadwaita warning that is not about paneterm.
+    """Drop one libadwaita warning that is not about shellac.
 
     KDE's GTK settings sync writes ``gtk-application-prefer-dark-theme`` into
     ``~/.config/gtk-4.0/settings.ini``; libadwaita then warns about it on every start. Color

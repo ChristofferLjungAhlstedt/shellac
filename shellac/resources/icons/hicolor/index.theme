@@ -1,6 +1,6 @@
 [Icon Theme]
 Name=Hicolor
-Comment=Fallback icon theme carrying paneterm's bundled symbolic icons
+Comment=Fallback icon theme carrying shellac's bundled symbolic icons
 Directories=scalable/actions,scalable/apps,scalable/mimetypes
 
 [scalable/actions]

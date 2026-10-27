@@ -2,7 +2,7 @@
 
 The config file is the user's to edit; the app must never rewrite it. What the user
 changes by clicking (sidebar visibility and width) is stored here instead, in
-``$XDG_STATE_HOME/paneterm/state.json``. Values in this file win over the config's
+``$XDG_STATE_HOME/shellac/state.json``. Values in this file win over the config's
 ``[sidebar] visible`` / ``width``, which act as the defaults for a first launch.
 
 GTK-free. Reading never raises; a missing or damaged file just means "no state".

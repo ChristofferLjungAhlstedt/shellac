@@ -11,7 +11,7 @@ import os
 from .file_tree_model import Entry
 from .file_type_icons import logo_name
 
-ICON_PREFIX = "paneterm-"
+ICON_PREFIX = "shellac-"
 
 CODE_EXTENSIONS = frozenset(
     [

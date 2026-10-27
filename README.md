@@ -1,10 +1,16 @@
-# paneterm
+# shellac
 
 A good-looking Linux terminal emulator with fast pane splitting and a file tree sidebar.
 Built on GTK4, libadwaita and VTE; Python 3.11+.
 
-> **paneterm is a working title.** The name is defined in `paneterm/__init__.py` and
-> `pyproject.toml` only, so renaming it later is a two-file change.
+Licensed under the GNU General Public License v3.0 or later (see `LICENSE`).
+Copyright (C) 2026 Christoffer Ljung Ahlstedt. Bundled third-party artwork is listed in
+`THIRD_PARTY_NOTICES.md`.
+
+> **Renamed from "paneterm".** If you used an earlier build, move your files once:
+> `mv ~/.config/paneterm ~/.config/shellac` and
+> `mv ~/.local/state/paneterm ~/.local/state/shellac`. Remove the old install with
+> `paneterm --uninstall-desktop` followed by `pipx uninstall paneterm`, then install shellac.
 
 ## Status
 
@@ -49,17 +55,17 @@ If two actions end up with the same accelerator, a warning is logged and shown a
 ## Install
 
 PyGObject, GTK4, libadwaita and VTE come from the distro, not from PyPI. Install those,
-then paneterm itself with pipx, and add it to the application menu:
+then shellac itself with pipx, and add it to the application menu:
 
 ```sh
 pipx install --system-site-packages .
-paneterm --install-desktop      # launcher + icon for this user, no root needed
+shellac --install-desktop      # launcher + icon for this user, no root needed
 ```
 
 `--system-site-packages` is required so the isolated environment can see the distro's
 `python3-gi`. pipx cannot install a launcher or an icon by itself, which is why
 `--install-desktop` exists: it writes
-`~/.local/share/applications/io.github.paneterm.Paneterm.desktop` and the icon next to it.
+`~/.local/share/applications/io.github.shellac.Shellac.desktop` and the icon next to it.
 Log out and back in (or wait a moment) if the menu does not show it at once.
 
 | Distro | Packages |
@@ -77,22 +83,22 @@ are **not verified**. If `apt` cannot find a package, search with `apt search vt
 
 ```sh
 pipx install --system-site-packages --force .   # update from a checkout
-paneterm --uninstall-desktop                    # remove the launcher and icon
-pipx uninstall paneterm
+shellac --uninstall-desktop                    # remove the launcher and icon
+pipx uninstall shellac
 ```
 
-Your settings stay in `~/.config/paneterm/` and `~/.local/state/paneterm/`; delete those
+Your settings stay in `~/.config/shellac/` and `~/.local/state/shellac/`; delete those
 folders too for a clean removal.
 
 ### Run from a checkout (no install)
 
 ```sh
-python3 -m paneterm             # from the project folder
-python3 -m paneterm --debug     # with debug logging
+python3 -m shellac             # from the project folder
+python3 -m shellac --debug     # with debug logging
 python3 -m pytest               # the unit tests (no display needed)
 ```
 
-paneterm is a single-instance application: starting it while it is running just brings the
+shellac is a single-instance application: starting it while it is running just brings the
 running window forward, so an installed copy can answer a launch meant for a checkout.
 Quit the installed one first.
 
@@ -122,21 +128,21 @@ Split panes and the sidebar need to know each shell's current directory. VTE lea
 from the OSC 7 escape sequence, which not every zsh setup emits. Add this to `~/.zshrc`:
 
 ```sh
-paneterm --print-shell-integration >> ~/.zshrc
+shellac --print-shell-integration >> ~/.zshrc
 ```
 
 The snippet percent-encodes the path, so directories with spaces or non-ASCII names work.
 It is three lines rather than the one line the spec asks for; a plain one-liner produces
-invalid URIs for such paths. Without it, paneterm falls back to reading
+invalid URIs for such paths. Without it, shellac falls back to reading
 `/proc/<pid>/cwd`, which also works but cannot see through nested shells.
 
 ## Configuration
 
-`$XDG_CONFIG_HOME/paneterm/config.toml` (default `~/.config/paneterm/config.toml`).
+`$XDG_CONFIG_HOME/shellac/config.toml` (default `~/.config/shellac/config.toml`).
 Every setting has a default, and a missing or partial file is fine. An invalid value
 logs a warning, shows one toast, and falls back to its default; it never crashes.
-User themes go in `~/.config/paneterm/themes/*.toml` and override bundled ones with the
-same file name. `paneterm --help` lists the command-line flags.
+User themes go in `~/.config/shellac/themes/*.toml` and override bundled ones with the
+same file name. `shellac --help` lists the command-line flags.
 
 ```toml
 [general]
@@ -204,7 +210,7 @@ Keybindings for actions that are not implemented are accepted and validated but 
 ## File tree sidebar
 
 Ctrl+Shift+B shows or hides it, Ctrl+Alt+B moves keyboard focus into it. Whether it is
-visible and how wide it is are remembered in `~/.local/state/paneterm/state.json`, which
+visible and how wide it is are remembered in `~/.local/state/shellac/state.json`, which
 wins over `[sidebar] visible/width` (those are only the first-launch defaults). Your
 config file is never rewritten.
 
@@ -251,7 +257,7 @@ Bundled: `catppuccin-mocha` (default), `tokyo-night`, `gruvbox-dark`, `nord` and
 `one-light`. **Ctrl+Shift+P** cycles through them, recoloring every pane, tab and the
 window chrome at once. Set one permanently with `theme = "nord"`.
 
-To add your own, drop a `.toml` file into `~/.config/paneterm/themes/` (the folder is
+To add your own, drop a `.toml` file into `~/.config/shellac/themes/` (the folder is
 created on first start). Copy one of the bundled files from the installed package as a
 template: `terminal` colors, a 16-entry `palette`, and `ui` colors for the chrome. A user
 theme with the same file name as a bundled one replaces it. Theme files are reloaded
@@ -281,14 +287,14 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   `login_shell = false` to turn that off.
 - **TERM and COLORTERM.** Always set to `xterm-256color` and `truecolor` for the child.
   FR-2's "unless the user overrides them" has no config key yet, because inheriting TERM
-  from whichever terminal launched paneterm would advertise the wrong capabilities.
+  from whichever terminal launched shellac would advertise the wrong capabilities.
 - **Window size.** `[window] width/height` was added so there are no magic constants in
   widget code. Persisting the size between launches belongs to M5.
 
 - **Light theme.** `one-light` rather than Catppuccin Latte: Latte's yellow and magenta fall
   below 2.5:1 contrast on its background. A unit test keeps every bundled theme readable
   (body text at least 7:1, colored ANSI entries at least 2.5:1).
-- **Config folders.** paneterm creates `~/.config/paneterm/` and its `themes/` folder on
+- **Config folders.** shellac creates `~/.config/shellac/` and its `themes/` folder on
   startup (not the config file itself). Directories are watched instead of the file, so
   editors that save by renaming a temp file over it are handled.
 - **Split naming.** `split_down` puts the new pane below, `split_right` puts it beside,

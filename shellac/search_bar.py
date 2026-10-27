@@ -14,7 +14,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Vte", "3.91")
 from gi.repository import Gdk, GLib, Gtk, Vte  # noqa: E402
 
-CSS_CLASS = "paneterm-search"
+CSS_CLASS = "shellac-search"
 PCRE2_CASELESS = 0x00000008
 PCRE2_MULTILINE = 0x00000400  # VTE requires this flag on search regexes
 
@@ -43,13 +43,13 @@ class SearchBar(Gtk.Box):
         self.append(self._entry)
 
         self._previous = self._button(
-            "paneterm-chevron-up-symbolic", "Previous match (Shift+Enter)", False
+            "shellac-chevron-up-symbolic", "Previous match (Shift+Enter)", False
         )
-        self._next = self._button("paneterm-chevron-down-symbolic", "Next match (Enter)", True)
+        self._next = self._button("shellac-chevron-down-symbolic", "Next match (Enter)", True)
         self._case = Gtk.ToggleButton(label="Aa", tooltip_text="Match case", active=case_sensitive)
         self._case.add_css_class("flat")
         self._case.connect("toggled", lambda _b: self._update(first=False))
-        close = Gtk.Button(icon_name="paneterm-close-symbolic", tooltip_text="Close (Escape)")
+        close = Gtk.Button(icon_name="shellac-close-symbolic", tooltip_text="Close (Escape)")
         close.add_css_class("flat")
         close.connect("clicked", lambda _b: self.close())
         for widget in (self._previous, self._next, self._case, close):
