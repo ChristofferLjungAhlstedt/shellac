@@ -37,6 +37,7 @@ DEFAULT_KEYBINDINGS: dict[str, str] = {
     "zoom_reset": "<Ctrl>0",
     "cycle_theme": "<Ctrl><Shift>p",
     "reload_config": "<Ctrl><Shift>r",
+    "command_palette": "<Ctrl><Shift>space",
 }
 
 # Extra accelerators bound next to the configured one. "plus" needs Shift on most layouts,
@@ -96,3 +97,130 @@ def find_conflicts(bindings: dict[str, str]) -> list[tuple[str, str]]:
         else:
             seen[normalized] = action
     return conflicts
+
+
+_KEY_LABELS = {
+    "left": "←",
+    "right": "→",
+    "up": "↑",
+    "down": "↓",
+    "page_up": "PgUp",
+    "page_down": "PgDn",
+    "return": "Enter",
+    "escape": "Esc",
+    "backspace": "⌫",
+    "tab": "Tab",
+    "space": "Space",
+    "plus": "+",
+    "minus": "−",
+    "equal": "=",
+    "comma": ",",
+    "period": ".",
+    "slash": "/",
+    "backslash": "\\",
+    "grave": "`",
+    "home": "Home",
+    "end": "End",
+    "insert": "Ins",
+    "delete": "Del",
+    "kp_add": "Num +",
+    "kp_subtract": "Num −",
+}
+
+_MODIFIER_LABELS = (("control", "Ctrl"), ("shift", "Shift"), ("alt", "Alt"), ("super", "Super"))
+
+
+def accelerator_tokens(accel: str) -> list[str]:
+    """Split an accelerator into display labels: ``<Ctrl><Shift>o`` -> Ctrl, Shift, O.
+
+    Used to draw each key as its own keycap. A malformed accelerator comes back as one token.
+    """
+    normalized = normalize_accelerator(accel)
+    if normalized is None:
+        return [accel]
+    modifiers, key = normalized
+    tokens = [label for name, label in _MODIFIER_LABELS if name in modifiers]
+    if "meta" in modifiers:
+        tokens.append("Meta")
+    if key in _KEY_LABELS:
+        tokens.append(_KEY_LABELS[key])
+    elif key.startswith("kp_") and len(key) > 3:
+        tokens.append("Num " + key[3:].upper())
+    elif len(key) == 1:
+        tokens.append(key.upper())
+    else:
+        tokens.append(key.upper() if key[0] == "f" and key[1:].isdigit() else key.capitalize())
+    return tokens
+
+
+def is_safe_binding(accel: str) -> bool:
+    """A binding must not steal plain typing: it needs a modifier, or be a function key."""
+    normalized = normalize_accelerator(accel)
+    if normalized is None:
+        return False
+    modifiers, key = normalized
+    if modifiers - {"shift"}:
+        return True
+    return key[0] == "f" and key[1:].isdigit()
+
+
+def canonical_accelerator(accel: str) -> str | None:
+    """Rewrite as ``<Ctrl><Shift><Alt>key`` (our style), or None if malformed."""
+    normalized = normalize_accelerator(accel)
+    if normalized is None:
+        return None
+    modifiers, key = normalized
+    names = {
+        "control": "<Ctrl>",
+        "shift": "<Shift>",
+        "alt": "<Alt>",
+        "super": "<Super>",
+        "meta": "<Meta>",
+    }
+    prefix = "".join(text for name, text in names.items() if name in modifiers)
+    # Keep the key's original capitalization rules: GTK key names such as Page_Down are
+    # case-sensitive, single letters are lowercase.
+    original = _MODIFIER_RE.sub("", accel.strip())
+    return prefix + (key if len(key) == 1 else original)
+
+
+def all_bindings(primary: dict[str, str], extra: dict[str, list[str]]) -> dict[str, list[str]]:
+    """Every accelerator of every action, primary first. An unbound action maps to ``[]``."""
+    return {
+        action: [primary[action], *extra.get(action, [])] if action in primary else []
+        for action in DEFAULT_KEYBINDINGS
+    }
+
+
+def find_binding_conflicts(bindings: dict[str, list[str]]) -> list[tuple[str, str, str]]:
+    """(first action, second action, accelerator) for each shared accelerator."""
+    seen: dict[tuple[frozenset[str], str], str] = {}
+    found: list[tuple[str, str, str]] = []
+    for action, accels in bindings.items():
+        for accel in accels:
+            normalized = normalize_accelerator(accel)
+            if normalized is None:
+                continue
+            owner = seen.get(normalized)
+            if owner is None:
+                seen[normalized] = action
+            elif owner != action:
+                found.append((owner, action, accel))
+    return found
+
+
+def owner_of(accel: str, bindings: dict[str, list[str]], *, ignore: str = "") -> str | None:
+    """The action (other than ``ignore``) that already uses ``accel``."""
+    wanted = normalize_accelerator(accel)
+    if wanted is None:
+        return None
+    for action, accels in bindings.items():
+        if action != ignore and any(normalize_accelerator(a) == wanted for a in accels):
+            return action
+    return None
+
+
+def with_key(accel: str, key: str) -> str:
+    """The same modifiers as ``accel`` with a different key: ``<Alt>x`` + ``3`` -> ``<Alt>3``."""
+    end = accel.rfind(">")
+    return accel[: end + 1] + key
