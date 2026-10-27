@@ -194,9 +194,7 @@ class FileTree(Gtk.Box):
         self._menu_node: Node | None = None
         self._monitors: dict[Node, tuple[Gio.FileMonitor, int]] = {}
         self._refresh_timers: dict[Node, int] = {}
-        self._pool = ThreadPoolExecutor(
-            max_workers=SCAN_THREADS, thread_name_prefix="shellac-scan"
-        )
+        self._pool = ThreadPoolExecutor(max_workers=SCAN_THREADS, thread_name_prefix="shellac-scan")
         # Git can be slow in a big repository; its own thread keeps directory scans quick.
         self._git_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="shellac-git")
 
