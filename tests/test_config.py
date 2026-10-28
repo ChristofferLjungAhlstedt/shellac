@@ -157,3 +157,14 @@ def test_an_empty_list_unbinds_the_action():
     assert result.warnings == []
     assert "copy" not in result.config.keybindings
     assert "paste" in result.config.keybindings
+
+
+def test_link_activation_and_context_menu_options():
+    default = parse_config({}).config.general
+    assert default.link_activation == "click" and default.context_menu is True
+    result = parse_config({"general": {"link_activation": "ctrl_click", "context_menu": False}})
+    assert result.warnings == []
+    assert result.config.general.link_activation == "ctrl_click"
+    assert result.config.general.context_menu is False
+    bad = parse_config({"general": {"link_activation": "double"}})
+    assert bad.config.general.link_activation == "click" and bad.warnings
