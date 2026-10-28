@@ -43,6 +43,7 @@ COMMANDS: tuple[Command, ...] = (
     Command("focus_sidebar", "Focus sidebar", "Move the keyboard into the file tree", "Sidebar"),
     Command("copy", "Copy", "Copy the selection", "Clipboard and search"),
     Command("paste", "Paste", "Paste from the clipboard", "Clipboard and search"),
+    Command("select_all", "Select all", "Select the whole scrollback", "Clipboard and search"),
     Command("search", "Search", "Search the scrollback", "Clipboard and search"),
     Command("reload_config", "Reload configuration", "Re-read config and themes", "General"),
     Command("command_palette", "Command palette", "This window", "General"),

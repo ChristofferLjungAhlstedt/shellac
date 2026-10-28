@@ -43,6 +43,7 @@ log = logging.getLogger(__name__)
 IMPLEMENTED_ACTIONS = (
     "copy",
     "paste",
+    "select_all",
     "split_down",
     "split_right",
     "close_pane",

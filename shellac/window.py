@@ -282,6 +282,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._add_action("focus_sidebar", self.focus_sidebar)
         self._add_action("copy", on_pane("copy"))
         self._add_action("paste", on_pane("paste"))
+        self._add_action("select_all", on_pane("select_all"))
         self._add_action("cycle_theme", lambda: self.get_application().cycle_theme())
         self._add_action("reload_config", lambda: self.get_application().reload_config())
         self._add_action("new_tab", self.new_tab)

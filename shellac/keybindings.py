@@ -31,6 +31,7 @@ DEFAULT_KEYBINDINGS: dict[str, str] = {
     **{f"goto_tab_{n}": f"<Alt>{n}" for n in range(1, 10)},
     "copy": "<Ctrl><Shift>c",
     "paste": "<Ctrl><Shift>v",
+    "select_all": "<Ctrl><Shift>a",
     "search": "<Ctrl><Shift>f",
     "zoom_in": "<Ctrl>plus",
     "zoom_out": "<Ctrl>minus",

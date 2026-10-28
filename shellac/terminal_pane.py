@@ -267,6 +267,9 @@ class TerminalPane:
 
     # -- clipboard and focus ------------------------------------------------------------
 
+    def select_all(self) -> None:
+        self.terminal.select_all()
+
     def copy(self) -> None:
         self.terminal.copy_clipboard_format(Vte.Format.TEXT)
 
