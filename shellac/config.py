@@ -26,7 +26,9 @@ class GeneralConfig:
     login_shell: bool = True  # pass -l to the shell (FR-1 asks for a login shell)
     scrollback_lines: int = 10000
     confirm_close_running: bool = True
-    clickable_urls: bool = True  # Ctrl+click opens a URL in the terminal output (FR-6)
+    clickable_urls: bool = True  # a click on a URL in the output opens it (FR-6)
+    link_activation: str = "click"  # click | ctrl_click: what opens a link
+    context_menu: bool = True  # right-click menu (Shift+right-click in mouse-aware programs)
     search_case_sensitive: bool = False  # starting state of the search bar's case toggle
     search_wrap_around: bool = True  # continue from the other end when a search runs out
 
@@ -116,6 +118,7 @@ class LoadResult:
 
 # Allowed values for string options, keyed by (section, option).
 ENUMS: dict[tuple[str, str], frozenset[str]] = {
+    ("general", "link_activation"): frozenset({"click", "ctrl_click"}),
     ("appearance", "focus_indicator"): frozenset({"border", "dim", "none"}),
     ("appearance", "cursor_shape"): frozenset({"block", "ibeam", "underline"}),
     ("appearance", "zoom_scope"): frozenset({"pane", "window"}),

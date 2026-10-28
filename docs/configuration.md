@@ -15,7 +15,9 @@ User themes go in `~/.config/shellac/themes/*.toml` (see [Themes](#themes)).
 shell = ""               # empty = $SHELL, then /bin/zsh, then /bin/bash
 login_shell = true       # start the shell with -l
 scrollback_lines = 10000
-clickable_urls = true    # Ctrl+click opens URLs
+clickable_urls = true    # clicking a URL in the output opens it
+link_activation = "click"  # click | ctrl_click: what opens a link
+context_menu = true      # right-click menu (copy, paste, select all, splits, link actions)
 search_case_sensitive = false
 search_wrap_around = true
 
