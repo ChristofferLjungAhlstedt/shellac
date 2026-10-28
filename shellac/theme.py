@@ -240,7 +240,7 @@ paned > separator {{
   background-color: {theme.divider};
   background-image: none;
 }}
-{_sidebar_css(theme)}{_focus_indicator_css(theme, appearance)}"""
+{_sidebar_css(theme)}{_palette_css(theme)}{_focus_indicator_css(theme, appearance)}"""
 
 
 # Which palette entry colors each git status. Taken from the theme, so every theme reads well.
@@ -258,6 +258,111 @@ def _git_status_css(theme: Theme) -> str:
         f".shellac-sidebar .git-{name} label {{ color: {theme.palette[index]}; }}"
         for name, index in GIT_STATUS_PALETTE_INDEX.items()
     )
+
+
+def _palette_css(theme: Theme) -> str:
+    """The command palette: keycaps, shortcut pills and group headings."""
+    return f"""
+.shellac-palette .palette-list {{
+  background: transparent;
+}}
+
+.shellac-palette .palette-row {{
+  border-radius: 10px;
+  margin: 1px 8px;
+  transition: background-color 120ms ease;
+}}
+
+.shellac-palette .palette-row:hover {{
+  background-color: alpha(currentColor, 0.05);
+}}
+
+.shellac-palette .palette-row:selected {{
+  background-color: alpha({theme.accent}, 0.16);
+}}
+
+.shellac-palette .palette-title {{
+  font-weight: 600;
+}}
+
+.shellac-palette .palette-group {{
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+  margin: 14px 18px 4px 18px;
+}}
+
+.shellac-palette .keycap {{
+  font-size: 0.82em;
+  font-weight: 600;
+  min-width: 1.15em;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background-color: alpha(currentColor, 0.09);
+  border: 1px solid alpha(currentColor, 0.16);
+  border-bottom-width: 2px;
+}}
+
+.shellac-palette .binding-pill {{
+  border-radius: 9px;
+  padding: 1px 2px 1px 2px;
+  background-color: alpha(currentColor, 0.05);
+  border: 1px solid alpha(currentColor, 0.12);
+}}
+
+.shellac-palette .binding-pill button.flat {{
+  min-height: 0;
+  min-width: 0;
+  padding: 2px 4px;
+  border-radius: 7px;
+}}
+
+.shellac-palette .binding-pill .pill-remove {{
+  padding: 3px;
+  opacity: 0.55;
+}}
+
+.shellac-palette .binding-pill .pill-remove:hover {{
+  opacity: 1;
+  color: {theme.palette[1]};
+}}
+
+.shellac-palette .binding-pill.capturing {{
+  border-color: {theme.accent};
+  background-color: alpha({theme.accent}, 0.14);
+}}
+
+.shellac-palette .capture-label {{
+  color: {theme.accent};
+  font-weight: 600;
+  font-size: 0.9em;
+  padding: 3px 10px;
+}}
+
+.shellac-palette .custom-badge {{
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 99px;
+  color: {theme.accent};
+  background-color: alpha({theme.accent}, 0.15);
+}}
+
+.shellac-palette .palette-footer {{
+  border-top: 1px solid alpha(currentColor, 0.1);
+  background-color: alpha(currentColor, 0.03);
+}}
+
+.shellac-palette .add-binding {{
+  opacity: 0.6;
+}}
+
+.shellac-palette .add-binding:hover {{
+  opacity: 1;
+}}
+"""
 
 
 def _sidebar_css(theme: Theme) -> str:

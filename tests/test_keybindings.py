@@ -43,3 +43,50 @@ def test_m2_actions_have_defaults():
     ):
         assert action in DEFAULT_KEYBINDINGS
     assert "goto_tab_10" not in DEFAULT_KEYBINDINGS
+
+
+def test_every_default_action_is_described_for_the_palette():
+    from shellac.commands import COMMANDS, GOTO_TAB_PREFIX, GROUPS
+
+    described = {c.action for c in COMMANDS}
+    needed = {a for a in DEFAULT_KEYBINDINGS if not a.startswith(GOTO_TAB_PREFIX)}
+    assert needed == described
+    assert {c.group for c in COMMANDS} <= set(GROUPS)
+
+
+def test_accelerator_tokens_for_keycaps():
+    from shellac.keybindings import accelerator_tokens
+
+    assert accelerator_tokens("<Ctrl><Shift>o") == ["Ctrl", "Shift", "O"]
+    assert accelerator_tokens("<Ctrl><Shift><Alt>Left") == ["Ctrl", "Shift", "Alt", "←"]
+    assert accelerator_tokens("<Ctrl>Page_Down") == ["Ctrl", "PgDn"]
+    assert accelerator_tokens("<Ctrl><Shift>space") == ["Ctrl", "Shift", "Space"]
+    assert accelerator_tokens("<Ctrl>plus") == ["Ctrl", "+"]
+    assert accelerator_tokens("<Alt>F4") == ["Alt", "F4"]
+    assert accelerator_tokens("<Bogus>x") == ["<Bogus>x"]
+
+
+def test_safe_bindings_and_canonical_form():
+    from shellac.keybindings import canonical_accelerator, is_safe_binding
+
+    assert is_safe_binding("<Ctrl>a") and is_safe_binding("<Alt>1") and is_safe_binding("F5")
+    assert not is_safe_binding("a") and not is_safe_binding("<Shift>a")
+    assert canonical_accelerator("<Control><Shift>O") == "<Ctrl><Shift>o"
+    assert canonical_accelerator("<Shift><Control>Page_Down") == "<Ctrl><Shift>Page_Down"
+    assert canonical_accelerator("nonsense<") is None
+
+
+def test_binding_conflicts_and_owner_lookup_cover_extra_shortcuts():
+    from shellac.keybindings import find_binding_conflicts, owner_of
+
+    bindings = {"a": ["<Ctrl>x", "<Alt>y"], "b": ["<Ctrl>z"], "c": ["<Alt><Shift>q", "<Control>X"]}
+    assert find_binding_conflicts(bindings) == [("a", "c", "<Control>X")]
+    assert owner_of("<Ctrl>z", bindings) == "b"
+    assert owner_of("<Ctrl>z", bindings, ignore="b") is None
+
+
+def test_with_key_keeps_the_modifiers():
+    from shellac.keybindings import with_key
+
+    assert with_key("<Ctrl><Alt>x", "3") == "<Ctrl><Alt>3"
+    assert with_key("<Alt>7", "1") == "<Alt>1"

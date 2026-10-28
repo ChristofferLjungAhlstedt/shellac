@@ -77,6 +77,20 @@ paste = "<Ctrl><Shift>v"
 Keybindings use GTK accelerator syntax (`<Ctrl><Shift>c`). If two actions share an
 accelerator, a warning is logged and shown as a toast.
 
+A value is one accelerator, or a list of them to give an action several shortcuts (the first
+is the primary one). An empty list leaves the action without a shortcut:
+
+```toml
+[keybindings]
+split_right = ["<Ctrl><Shift>e", "<Ctrl><Alt>r"]
+paste = []                         # no shortcut
+```
+
+You do not have to edit this by hand: the command palette (`Ctrl+Shift+Space`, then the pen
+button; changes apply when you press Save) edits exactly these lines. It only changes the lines of the actions you edit, so your
+comments and the rest of the file stay as they are. If the file uses a layout it will not guess
+at (for example `keybindings = { ... }` as an inline table) it asks you to edit by hand.
+
 | Action name | Default | Does |
 | --- | --- | --- |
 | `split_down` | `<Ctrl><Shift>o` | new pane below |
@@ -91,6 +105,7 @@ accelerator, a warning is logged and shown as a toast.
 | `search` | `<Ctrl><Shift>f` | search the scrollback |
 | `zoom_in`, `zoom_out`, `zoom_reset` | `<Ctrl>plus`, `<Ctrl>minus`, `<Ctrl>0` | font size |
 | `cycle_theme`, `reload_config` | `<Ctrl><Shift>p`, `<Ctrl><Shift>r` | themes and config |
+| `command_palette` | `<Ctrl><Shift>space` | open the command palette |
 | `toggle_sidebar`, `focus_sidebar` | `<Ctrl><Shift>b`, `<Ctrl><Alt>b` | sidebar |
 
 ## Sidebar file activation
@@ -132,7 +147,11 @@ the tab bar and keybindings. Ctrl+Shift+R reloads on demand.
 
 - A mistake never breaks a running window: an invalid value, an unknown theme or broken
   TOML logs a warning, shows one toast, and uses the default for that value.
-- A theme picked with Ctrl+Shift+P is remembered between sessions (in `~/.local/state/shellac/state.json`, never in your config). It lasts until the config is reloaded or edited, or until you change `theme`, `dark_theme`, `light_theme` or `follow_system_scheme` in the config. While
+- A theme picked with Ctrl+Shift+P is remembered between sessions (in
+  `~/.local/state/shellac/state.json`, never in your config). It survives saving unrelated
+  settings, including shortcuts edited in the command palette. It is dropped by Ctrl+Shift+R,
+  or when you change `theme`, `dark_theme`, `light_theme` or `follow_system_scheme` in the
+  config. While
   following the system scheme, cycling pauses the following until the next reload.
 - Settings that only matter at creation (`shell`, `login_shell`, window size) apply to
   new panes and tabs, not to shells that are already running.

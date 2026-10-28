@@ -29,6 +29,9 @@ know, with a few things added.
   ignored files are dimmed or hidden. Git runs off the main thread, so the window never stalls.
 - **Themes.** Five bundled themes, runtime switching with one key, your own themes as plain
   TOML files, and optional following of the system light/dark setting.
+- **Command palette.** A compact window listing every command with its shortcuts, searchable
+  and runnable. The pen button makes the shortcuts editable: change one, add a second shortcut
+  for the same command, or restore the default. Changes are written to `config.toml`.
 - **Live configuration.** Edit `config.toml` or a theme and every window updates at once.
   A mistake never breaks a running window.
 - **Search and links.** Search the scrollback with highlighting, and Ctrl+click URLs.
@@ -38,6 +41,10 @@ know, with a few things added.
 
 <details>
 <summary>More screenshots</summary>
+
+The command palette, compact and in edit mode:
+
+![Command palette](docs/screenshots/palette.png) ![Editing shortcuts](docs/screenshots/palette-edit.png)
 
 Scrollback search:
 
@@ -115,12 +122,29 @@ Everything uses Ctrl+Shift or Ctrl+Alt, so nothing collides with your shell's sh
 | Copy / paste | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
 | Search the scrollback | `Ctrl+Shift+F` |
 | Font zoom in / out / reset | `Ctrl+plus` / `Ctrl+minus` / `Ctrl+0` |
+| Command palette (all shortcuts, editable) | `Ctrl+Shift+Space` |
 | Cycle theme | `Ctrl+Shift+P` |
 | Reload configuration | `Ctrl+Shift+R` |
 | Show or hide the sidebar | `Ctrl+Shift+B` |
 | Move keyboard focus to the sidebar | `Ctrl+Alt+B` |
 
-All of these can be remapped under `[keybindings]` in the config file (see
+Forgot one? Press `Ctrl+Shift+Space`, or click the `>_` button at the right end of the title
+bar (its tooltip shows the current shortcut), for the **command palette**: it lists every command with
+its shortcuts, filters as you type, and runs the selected command on Enter. It is a small
+window you can leave open next to the terminal (the pin button keeps it open after running a
+command). The **pen button** switches to edit mode: click a shortcut and press the new keys,
+use **+** to give a command a second shortcut, **×** to remove one, or the circular arrow to
+restore that command's default. The **Go to tab** row sets the modifier for tabs 1 to 9 at
+once: press a modifier plus a digit, such as `Alt+1`. A command with several shortcuts lists
+them one per line, and a **Custom** badge marks every command whose shortcut is not the
+default (hover it, or the restore arrow, to see what the default is).
+
+Your edits are only a draft until you press **Save**, which writes them into `[keybindings]`
+in your config file (nothing else in the file is touched). **Cancel** throws the draft away,
+**Reset** puts every default shortcut back into the draft, and leaving with unsaved changes
+asks first.
+
+Shortcuts can also be remapped by hand under `[keybindings]` (see
 [Configuration](#configuration)).
 
 ## The file tree
@@ -216,7 +240,7 @@ through nested shells such as `ssh`.
 ## Development
 
 ```sh
-git clone https://github.com/ChristofferLjungAhlstedt/shellac.git shellac && cd shellac
+git clone <repository-url> shellac && cd shellac
 python3 -m venv --system-site-packages .venv    # the system packages provide PyGObject
 . .venv/bin/activate
 pip install -e '.[dev]'
