@@ -292,14 +292,11 @@ popover.menu button.flat {{
 }}
 
 .shellac-palette .palette-group {{
-  font-size: 0.72em;
+  font-size: 0.8em;
   font-weight: 700;
   letter-spacing: 0.08em;
-  /* Not `opacity`: it renders the label into a texture the size of its box, and fonts whose
-     glyphs reach above their line box (many monospace and Nerd Fonts) lose their tops. */
-  color: alpha(currentColor, 0.55);
-  padding: 18px 18px 8px 18px;
-  min-height: 1.6em;
+  opacity: 0.55;
+  margin: 14px 18px 4px 18px;
 }}
 
 .shellac-palette .keycap {{
