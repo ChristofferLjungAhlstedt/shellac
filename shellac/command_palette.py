@@ -226,14 +226,34 @@ class CommandPalette(Adw.Window):
         self._select_first_visible()
         GLib.idle_add(adjustment.set_value, position)
 
+    def _title_box(self, title: str, action: str) -> Gtk.Box:
+        """The command's name, with a "Custom" badge when its shortcut is not the default."""
+        box = Gtk.Box(spacing=8)
+        label = Gtk.Label(label=title, xalign=0.0)
+        label.add_css_class("palette-title")
+        box.append(label)
+        if self._differs_from_default(action):
+            badge = Gtk.Label(label="Custom", valign=Gtk.Align.CENTER)
+            badge.add_css_class("custom-badge")
+            badge.set_tooltip_text(f"Not the default shortcut. {self._default_text(action)}")
+            box.append(badge)
+        return box
+
+    def _default_text(self, action: str) -> str:
+        if action == GOTO_ACTIONS[0]:
+            tokens = accelerator_tokens(DEFAULT_KEYBINDINGS[action])
+            tokens[-1] = "1–9"
+        else:
+            tokens = accelerator_tokens(DEFAULT_KEYBINDINGS[action])
+        return "Default: " + " + ".join(tokens)
+
     def _make_row(self, command: Command) -> Gtk.ListBoxRow:
         row = Gtk.ListBoxRow(activatable=not self._editing)
         row.add_css_class("palette-row")
         box = Gtk.Box(spacing=16, margin_start=16, margin_end=12, margin_top=9, margin_bottom=9)
 
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
-        title = Gtk.Label(label=command.title, xalign=0.0)
-        title.add_css_class("palette-title")
+        title = self._title_box(command.title, command.action)
         description = Gtk.Label(label=command.description, xalign=0.0, ellipsize=3)
         description.add_css_class("dim-label")
         description.add_css_class("caption")
@@ -241,22 +261,51 @@ class CommandPalette(Adw.Window):
         text.append(description)
         box.append(text)
 
-        shortcuts = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
+        # Several shortcuts stack, one per line, so a row never gets crowded. The "+" button
+        # sits at the end of the last line; the lines above leave room for it, so the keys
+        # stay aligned.
+        column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6, valign=Gtk.Align.CENTER)
+        column.set_halign(Gtk.Align.END)
         accels = self._draft.get(command.action, [])
-        for index, accel in enumerate(accels):
-            shortcuts.append(self._pill(command.action, index, accel))
-        if not accels and not self._editing:
-            none = Gtk.Label(label="Not set")
-            none.add_css_class("dim-label")
-            none.add_css_class("caption")
-            shortcuts.append(none)
+        lines: list[Gtk.Widget] = [
+            self._pill(command.action, index, accel) for index, accel in enumerate(accels)
+        ]
         if self._editing:
             if self._capture == (command.action, None):
-                shortcuts.append(self._capturing_pill())
+                lines.append(self._capturing_pill())
+                last_extra: Gtk.Widget | None = None
             else:
-                shortcuts.append(self._add_button(command.action))
-            if self._differs_from_default(command.action):
-                shortcuts.append(self._reset_button(command.action))
+                last_extra = self._add_button(command.action)
+        else:
+            last_extra = None
+            if not accels:
+                none = Gtk.Label(label="Not set")
+                none.add_css_class("dim-label")
+                none.add_css_class("caption")
+                lines.append(none)
+        gap = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        if last_extra is not None:
+            gap.add_widget(last_extra)
+        for number, widget in enumerate(lines):
+            line = Gtk.Box(spacing=4, halign=Gtk.Align.END)
+            line.append(widget)
+            if self._editing and last_extra is not None:
+                if number == len(lines) - 1:
+                    line.append(last_extra)
+                    last_extra = None
+                else:
+                    spacer = Gtk.Box()
+                    gap.add_widget(spacer)
+                    line.append(spacer)
+            column.append(line)
+        if last_extra is not None:  # no shortcut yet: just the "+"
+            line = Gtk.Box(halign=Gtk.Align.END)
+            line.append(last_extra)
+            column.append(line)
+        shortcuts = Gtk.Box(spacing=8, valign=Gtk.Align.CENTER)
+        shortcuts.append(column)
+        if self._editing and self._differs_from_default(command.action):
+            shortcuts.append(self._reset_button(command.action))
         box.append(shortcuts)
         row.set_child(box)
         return row
@@ -268,8 +317,7 @@ class CommandPalette(Adw.Window):
         row.add_css_class("palette-row")
         box = Gtk.Box(spacing=16, margin_start=16, margin_end=12, margin_top=9, margin_bottom=9)
         text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2, hexpand=True)
-        title = Gtk.Label(label=_GOTO_COMMAND.title, xalign=0.0)
-        title.add_css_class("palette-title")
+        title = self._title_box(_GOTO_COMMAND.title, action)
         note = (
             "Press a modifier plus a digit (for example Alt+1) to set it for tabs 1 to 9"
             if self._editing
@@ -369,7 +417,10 @@ class CommandPalette(Adw.Window):
         return button
 
     def _reset_button(self, action: str) -> Gtk.Widget:
-        button = Gtk.Button(icon_name="shellac-reset-symbolic", tooltip_text="Restore the default")
+        button = Gtk.Button(
+            icon_name="shellac-reset-symbolic",
+            tooltip_text=f"Restore the default. {self._default_text(action)}",
+        )
         button.add_css_class("flat")
         button.add_css_class("circular")
         button.set_valign(Gtk.Align.CENTER)
