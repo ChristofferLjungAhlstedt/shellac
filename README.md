@@ -128,13 +128,16 @@ Everything uses Ctrl+Shift or Ctrl+Alt, so nothing collides with your shell's sh
 | Show or hide the sidebar | `Ctrl+Shift+B` |
 | Move keyboard focus to the sidebar | `Ctrl+Alt+B` |
 
-Forgot one? Press `Ctrl+Shift+Space` for the **command palette**: it lists every command with
+Forgot one? Press `Ctrl+Shift+Space`, or click the `>_` button at the right end of the title
+bar (its tooltip shows the current shortcut), for the **command palette**: it lists every command with
 its shortcuts, filters as you type, and runs the selected command on Enter. It is a small
 window you can leave open next to the terminal (the pin button keeps it open after running a
 command). The **pen button** switches to edit mode: click a shortcut and press the new keys,
 use **+** to give a command a second shortcut, **×** to remove one, or the circular arrow to
 restore that command's default. The **Go to tab** row sets the modifier for tabs 1 to 9 at
-once: press a modifier plus a digit, such as `Alt+1`.
+once: press a modifier plus a digit, such as `Alt+1`. A command with several shortcuts lists
+them one per line, and a **Custom** badge marks every command whose shortcut is not the
+default (hover it, or the restore arrow, to see what the default is).
 
 Your edits are only a draft until you press **Save**, which writes them into `[keybindings]`
 in your config file (nothing else in the file is touched). **Cancel** throws the draft away,
@@ -237,7 +240,7 @@ through nested shells such as `ssh`.
 ## Development
 
 ```sh
-git clone https://github.com/ChristofferLjungAhlstedt/shellac.git shellac && cd shellac
+git clone <repository-url> shellac && cd shellac
 python3 -m venv --system-site-packages .venv    # the system packages provide PyGObject
 . .venv/bin/activate
 pip install -e '.[dev]'
