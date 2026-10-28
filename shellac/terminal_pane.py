@@ -10,9 +10,10 @@ from collections.abc import Callable
 
 import gi
 
+gi.require_version("Graphene", "1.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Vte", "3.91")
-from gi.repository import Gdk, GLib, Gtk, Pango, Vte  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Graphene, Gtk, Pango, Vte  # noqa: E402
 
 from .config import Config  # noqa: E402
 from .links import URL_PATTERN, is_openable  # noqa: E402
@@ -106,7 +107,13 @@ class TerminalPane:
         self.terminal.add_controller(self._focus_controller)
 
         self._clickable_urls = config.general.clickable_urls
+        self._link_activation = config.general.link_activation
+        self._context_menu = config.general.context_menu
+        self._press: tuple[float, float] | None = None  # surface position of the button press
+        self._menu_uri: str | None = None
+        self._popover: Gtk.PopoverMenu | None = None
         self._setup_links()
+        self._setup_context_menu()
 
         self.apply_style(config, theme)
         self.runs_shell = argv is None  # False for a pane that runs one command, e.g. an editor
@@ -139,6 +146,8 @@ class TerminalPane:
         )
         self.terminal.set_scrollback_lines(config.general.scrollback_lines)
         self._clickable_urls = config.general.clickable_urls
+        self._link_activation = config.general.link_activation
+        self._context_menu = config.general.context_menu
 
     # -- font zoom (FR-8) ---------------------------------------------------------------
 
@@ -156,10 +165,12 @@ class TerminalPane:
         regex = Vte.Regex.new_for_match(URL_PATTERN, -1, PCRE2_MULTILINE)
         tag = self.terminal.match_add_regex(regex, 0)
         self.terminal.match_set_cursor_name(tag, "pointer")
-        self._click = Gtk.GestureClick(button=1)
-        self._click.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
-        self._click_handler = self._click.connect("pressed", self._handle_click)
-        self.terminal.add_controller(self._click)
+        # Raw events: a gesture would be cancelled when the terminal starts a selection, but
+        # a click on a link has to be told apart from a drag by looking at the release.
+        self._raw = Gtk.EventControllerLegacy()
+        self._raw.set_propagation_phase(Gtk.PropagationPhase.CAPTURE)
+        self._raw_handler = self._raw.connect("event", self._handle_raw_event)
+        self.terminal.add_controller(self._raw)
 
     def uri_at(self, x: float, y: float) -> str | None:
         link = self.terminal.check_hyperlink_at(x, y)
@@ -168,23 +179,148 @@ class TerminalPane:
         text, _tag = self.terminal.check_match_at(x, y)
         return text or None
 
-    def _handle_click(self, gesture: Gtk.GestureClick, _presses: int, x: float, y: float) -> None:
-        state = gesture.get_current_event_state()
-        if not self._clickable_urls or not state & Gdk.ModifierType.CONTROL_MASK:
+    def _handle_raw_event(
+        self, controller: Gtk.EventControllerLegacy, _event: Gdk.Event | None = None
+    ) -> bool:
+        # The event argument arrives as None through PyGObject; ask the controller instead.
+        event = controller.get_current_event()
+        if event is None:
+            return False
+        kind = event.get_event_type()
+        if kind not in (Gdk.EventType.BUTTON_PRESS, Gdk.EventType.BUTTON_RELEASE):
+            return False
+        if event.get_button() != Gdk.BUTTON_PRIMARY:
+            return False
+        ok, x, y = event.get_position()
+        if not ok:
+            return False
+        if kind == Gdk.EventType.BUTTON_PRESS:
+            self._press = (x, y) if event.get_modifier_state() is not None else None
+            return False
+        press, self._press = self._press, None
+        if press is not None and abs(x - press[0]) <= 4 and abs(y - press[1]) <= 4:
+            self._maybe_open_link(x, y, event.get_modifier_state())
+        return False
+
+    def _widget_point(self, x: float, y: float) -> tuple[float, float] | None:
+        """Surface coordinates of an event -> coordinates inside the terminal widget."""
+        native = self.terminal.get_native()
+        if native is None:
+            return None
+        tx, ty = native.get_surface_transform()
+        ok, point = native.compute_point(self.terminal, Graphene.Point().init(x - tx, y - ty))
+        return (point.x, point.y) if ok else None
+
+    def _maybe_open_link(self, x: float, y: float, state: Gdk.ModifierType) -> None:
+        """Open the link under a plain click (or Ctrl+click, as configured)."""
+        if not self._clickable_urls:
             return
-        uri = self.uri_at(x, y)
-        if not uri or not is_openable(uri):
+        ctrl = bool(state & Gdk.ModifierType.CONTROL_MASK)
+        if self._link_activation == "ctrl_click":
+            if not ctrl:
+                return
+        elif state & (Gdk.ModifierType.SHIFT_MASK | Gdk.ModifierType.ALT_MASK):
+            return  # Shift extends a selection
+        point = self._widget_point(x, y)
+        if point is None:
             return
-        gesture.set_state(Gtk.EventSequenceState.CLAIMED)  # no selection starts from this click
+        uri = self.uri_at(*point)
+        if uri and is_openable(uri):
+            self.open_link(uri)
+
+    def open_link(self, uri: str) -> None:
+        """Open ``uri`` in the user's default application (a browser for web links)."""
+        if not is_openable(uri):
+            return
         launcher = Gtk.UriLauncher.new(uri)
-        launcher.launch(self.widget.get_root(), None, self._uri_launched)
+        launcher.launch(self.widget.get_root(), None, self._uri_launched, uri)
 
     @staticmethod
-    def _uri_launched(launcher: Gtk.UriLauncher, result: object) -> None:
+    def _uri_launched(launcher: Gtk.UriLauncher, result: object, uri: str) -> None:
         try:
             launcher.launch_finish(result)
         except GLib.Error as exc:
-            log.warning("cannot open %s: %s", launcher.get_uri(), exc.message)
+            log.warning("cannot open %s with the desktop launcher: %s", uri, exc.message)
+            # Some setups have no portal; xdg-open usually still works.
+            try:
+                Gio.Subprocess.new(["xdg-open", uri], Gio.SubprocessFlags.STDERR_SILENCE)
+            except GLib.Error as inner:
+                log.warning("xdg-open failed for %s: %s", uri, inner.message)
+
+    # -- right-click menu ---------------------------------------------------------------
+
+    def _setup_context_menu(self) -> None:
+        group = Gio.SimpleActionGroup()
+        for name, callback in (
+            ("open-link", lambda *_: self._menu_uri and self.open_link(self._menu_uri)),
+            ("copy-link", lambda *_: self._copy_link()),
+        ):
+            action = Gio.SimpleAction.new(name, None)
+            action.connect("activate", callback)
+            group.add_action(action)
+        self.terminal.insert_action_group("term", group)
+        self._right = Gtk.GestureClick(button=3)
+        self._right_handler = self._right.connect("pressed", self._handle_right_click)
+        self.terminal.add_controller(self._right)
+
+    def _copy_link(self) -> None:
+        if self._menu_uri:
+            self.terminal.get_clipboard().set(self._menu_uri)
+
+    def _build_menu(self, uri: str | None) -> Gio.Menu:
+        menu = Gio.Menu()
+        if uri is not None:
+            links = Gio.Menu()
+            links.append("Open Link", "term.open-link")
+            links.append("Copy Link Address", "term.copy-link")
+            menu.append_section(None, links)
+        clipboard = Gio.Menu()
+        if self.terminal.get_has_selection():
+            clipboard.append("Copy", "win.copy")
+        clipboard.append("Paste", "win.paste")
+        clipboard.append("Select All", "win.select_all")
+        menu.append_section(None, clipboard)
+        panes = Gio.Menu()
+        panes.append("Split Right", "win.split_right")
+        panes.append("Split Down", "win.split_down")
+        panes.append("Zoom Pane", "win.zoom_pane")
+        panes.append("Close Pane", "win.close_pane")
+        menu.append_section(None, panes)
+        tools = Gio.Menu()
+        tools.append("Search…", "win.search")
+        tools.append("Command Palette", "win.command_palette")
+        menu.append_section(None, tools)
+        return menu
+
+    def _handle_right_click(
+        self, _gesture: Gtk.GestureClick, _presses: int, x: float, y: float
+    ) -> None:
+        if not self._context_menu or self._closed:
+            return
+        uri = self.uri_at(x, y)
+        self._menu_uri = uri if uri and is_openable(uri) else None
+        self._close_popover()
+        popover = Gtk.PopoverMenu.new_from_model(self._build_menu(self._menu_uri))
+        popover.set_parent(self.terminal)
+        popover.set_has_arrow(False)
+        popover.set_halign(Gtk.Align.START)
+        popover.set_pointing_to(Gdk.Rectangle(x=int(x), y=int(y), width=1, height=1))
+        popover.connect("closed", lambda p: GLib.idle_add(self._drop_popover, p))
+        self._popover = popover
+        popover.popup()
+
+    def _drop_popover(self, popover: Gtk.PopoverMenu) -> bool:
+        if popover.get_parent() is not None:
+            popover.unparent()
+        if self._popover is popover:
+            self._popover = None
+        return GLib.SOURCE_REMOVE
+
+    def _close_popover(self) -> None:
+        if self._popover is not None:
+            popover, self._popover = self._popover, None
+            popover.popdown()
+            popover.unparent()
 
     # -- process ------------------------------------------------------------------------
 
@@ -301,8 +437,11 @@ class TerminalPane:
         self._on_exited = None
         self._on_title_changed = None
         self._on_focus = None
-        self._click.disconnect(self._click_handler)
-        self.terminal.remove_controller(self._click)
+        self._raw.disconnect(self._raw_handler)
+        self.terminal.remove_controller(self._raw)
+        self._close_popover()
+        self._right.disconnect(self._right_handler)
+        self.terminal.remove_controller(self._right)
         if terminate and self.child_pid is not None:
             with contextlib.suppress(ProcessLookupError):
                 os.kill(self.child_pid, signal.SIGHUP)
