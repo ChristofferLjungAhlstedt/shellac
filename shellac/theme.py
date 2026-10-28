@@ -263,6 +263,12 @@ def _git_status_css(theme: Theme) -> str:
 def _palette_css(theme: Theme) -> str:
     """The command palette: keycaps, shortcut pills and group headings."""
     return f"""
+popover.menu button.flat {{
+  font-weight: normal;
+  min-height: 0;
+  padding: 6px 10px;
+}}
+
 .shellac-palette .palette-list {{
   background: transparent;
 }}
@@ -289,9 +295,11 @@ def _palette_css(theme: Theme) -> str:
   font-size: 0.72em;
   font-weight: 700;
   letter-spacing: 0.08em;
-  opacity: 0.55;
-  padding: 16px 18px 6px 18px;
-  min-height: 1.4em;
+  /* Not `opacity`: it renders the label into a texture the size of its box, and fonts whose
+     glyphs reach above their line box (many monospace and Nerd Fonts) lose their tops. */
+  color: alpha(currentColor, 0.55);
+  padding: 18px 18px 8px 18px;
+  min-height: 1.6em;
 }}
 
 .shellac-palette .keycap {{
