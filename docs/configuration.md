@@ -1,8 +1,8 @@
 # Configuration reference
 
-shellac reads `$XDG_CONFIG_HOME/shellac/config.toml` (default `~/.config/shellac/config.toml`).
+Shellac reads `$XDG_CONFIG_HOME/shellac/config.toml` (default `~/.config/shellac/config.toml`).
 Every setting has a default, and a missing or partial file is fine. An invalid value logs a
-warning, shows one toast, and falls back to its default; it never crashes. shellac never
+warning, shows one toast, and falls back to its default; it never crashes. Shellac never
 rewrites your config file.
 
 User themes go in `~/.config/shellac/themes/*.toml` (see [Themes](#themes)).

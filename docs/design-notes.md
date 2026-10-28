@@ -10,14 +10,14 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   `login_shell = false` to turn that off.
 - **TERM and COLORTERM.** Always set to `xterm-256color` and `truecolor` for the child.
   FR-2's "unless the user overrides them" has no config key yet, because inheriting TERM
-  from whichever terminal launched shellac would advertise the wrong capabilities.
+  from whichever terminal launched Shellac would advertise the wrong capabilities.
 - **Window size.** `[window] width/height` was added so there are no magic constants in
   widget code.
 
 - **Light theme.** `one-light` rather than Catppuccin Latte: Latte's yellow and magenta fall
   below 2.5:1 contrast on its background. A unit test keeps every bundled theme readable
   (body text at least 7:1, colored ANSI entries at least 2.5:1).
-- **Config folders.** shellac creates `~/.config/shellac/` and its `themes/` folder on
+- **Config folders.** Shellac creates `~/.config/shellac/` and its `themes/` folder on
   startup (not the config file itself). Directories are watched instead of the file, so
   editors that save by renaming a temp file over it are handled.
 - **Split naming.** `split_down` puts the new pane below, `split_right` puts it beside,
@@ -72,7 +72,7 @@ daily use is on Kubuntu 26.04 with Python 3.14. Not yet tested on Wayland.
 
 ## Renamed from "paneterm"
 
-shellac was developed under the working title paneterm. If you used an early build, move
+Shellac was developed under the working title paneterm. If you used an early build, move
 your files once:
 
 ```sh

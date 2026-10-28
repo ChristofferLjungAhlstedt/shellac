@@ -1,6 +1,6 @@
 # Ideas and roadmap
 
-A brainstorm of possible additions to shellac, grouped by area. Items marked **planned** are
+A brainstorm of possible additions to Shellac, grouped by area. Items marked **planned** are
 being built; the rest are candidates, in no fixed order.
 
 ## Planned

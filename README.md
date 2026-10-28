@@ -1,8 +1,8 @@
-<h1 align="center">shellac</h1>
+<h1 align="center">Shellac</h1>
 
 <p align="center">
-  A good-looking Linux terminal emulator with fast pane splitting<br>
-  and a file tree that follows you around.
+  A Linux terminal emulator with split panes, tabs<br>
+  and a file tree sidebar.
 </p>
 
 <p align="center">
@@ -11,11 +11,11 @@
   <img alt="GTK4 + libadwaita + VTE" src="https://img.shields.io/badge/GTK4-libadwaita-green">
 </p>
 
-![shellac with split panes and the file tree](docs/screenshots/splits-and-sidebar.png)
+![Shellac with split panes and the file tree](docs/screenshots/splits-and-sidebar.png)
 
-shellac is a terminal for people who live in splits. It is built on GTK4, libadwaita and
-VTE, so it looks at home on a modern Linux desktop and behaves like the terminal you already
-know, with a few things added.
+Shellac is a terminal emulator for Linux, built on GTK4, libadwaita and VTE. It provides
+nested pane splits, tabs, a file tree sidebar with git status, a searchable command palette
+and live-reloaded TOML configuration, in a native desktop application.
 
 ## Features
 
@@ -40,7 +40,7 @@ know, with a few things added.
   split, zoom or close the pane, search, and the command palette.
 - **Configurable file actions.** Clicking a file can open your editor, run a command, run the
   file, paste its path or open it with the desktop, per extension if you like.
-- **Remembers your layout.** Window size, sidebar visibility and width.
+- **Persistent window state.** Window size, sidebar visibility and sidebar width are restored on start.
 
 <details>
 <summary>More screenshots</summary>
@@ -61,7 +61,7 @@ A light theme (`one-light`):
 
 ## Install
 
-shellac needs PyGObject, GTK4, libadwaita and VTE from your distribution (they are not on
+Shellac needs PyGObject, GTK4, libadwaita and VTE from your distribution (they are not on
 PyPI), then installs with pipx.
 
 **1. Install the system packages**
@@ -76,7 +76,7 @@ The Debian/Ubuntu line is tested on Kubuntu 26.04. The Fedora and Arch package n
 from those distros' package lists and have not been verified; if one is not found, please
 open an issue.
 
-**2. Install shellac**
+**2. Install Shellac**
 
 From a clone of this repository:
 
@@ -212,7 +212,7 @@ Press `Ctrl+Shift+P` to cycle through them. To make your own, put a `.toml` file
 
 ### Fonts
 
-shellac uses `font_family` from the config and falls back to common Nerd Fonts and then to
+Shellac uses `font_family` from the config and falls back to common Nerd Fonts and then to
 the system monospace font. For prompt themes with icons (Powerlevel10k, starship), install a
 [Nerd Font](https://www.nerdfonts.com/) and set it as `font_family`.
 
@@ -226,7 +226,7 @@ directory or the sidebar does not follow your `cd`, add the snippet to your `~/.
 shellac --print-shell-integration >> ~/.zshrc
 ```
 
-Without it, shellac falls back to reading `/proc/<pid>/cwd`, which also works but cannot see
+Without it, Shellac falls back to reading `/proc/<pid>/cwd`, which also works but cannot see
 through nested shells such as `ssh`.
 
 ## Troubleshooting
@@ -237,7 +237,7 @@ through nested shells such as `ssh`.
 | No menu entry after install | run `shellac --install-desktop`, then log out and back in |
 | New splits open in `~` | add the [shell integration](#shell-integration) |
 | Prompt shows boxes instead of symbols | use a Nerd Font as `font_family` |
-| Starting it again does nothing | shellac is single-instance: it brings the running window forward |
+| Starting it again does nothing | Shellac is single-instance: it brings the running window forward |
 | A program using the mouse (vim, tmux) also gets your right-click | the menu opens next to the program's own reaction; set `context_menu = false` to turn the menu off |
 | Want debug output | `shellac --debug` |
 
@@ -256,7 +256,7 @@ python3 -m shellac       # run from the checkout
 
 The configuration, theme, keybinding, pane-tree and file-tree model code does not import
 GTK, so it is covered by plain unit tests. The window and widgets are checked by hand and with
-scripted runs under Xvfb. If you installed shellac with pipx, quit it first, because a second
+scripted runs under Xvfb. If you installed Shellac with pipx, quit it first, because a second
 instance just raises the running one.
 
 Design decisions, milestone history and testing notes are in
@@ -269,7 +269,7 @@ shell" prompt is not built.
 
 ## License
 
-shellac is free software under the **GNU General Public License v3.0 or later**; see
+Shellac is free software under the **GNU General Public License v3.0 or later**; see
 [`LICENSE`](LICENSE). Copyright (C) 2026 Christoffer Ljung Ahlstedt.
 
 The file-type icons come from [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)
