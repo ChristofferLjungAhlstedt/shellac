@@ -340,6 +340,16 @@ def _palette_css(theme: Theme) -> str:
   padding: 3px 10px;
 }}
 
+.shellac-palette .custom-badge {{
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 1px 7px;
+  border-radius: 99px;
+  color: {theme.accent};
+  background-color: alpha({theme.accent}, 0.15);
+}}
+
 .shellac-palette .palette-footer {{
   border-top: 1px solid alpha(currentColor, 0.1);
   background-color: alpha(currentColor, 0.03);
