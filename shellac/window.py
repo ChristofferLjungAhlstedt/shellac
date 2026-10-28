@@ -18,6 +18,7 @@ from .config import Config  # noqa: E402
 from .file_actions import Problem, plan_file_action  # noqa: E402
 from .file_tree import FileTree, register_icons  # noqa: E402
 from .file_tree_model import Node  # noqa: E402
+from .keybindings import accelerator_tokens  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
 from .search_bar import SearchBar  # noqa: E402
@@ -91,6 +92,11 @@ class MainWindow(Adw.ApplicationWindow):
         header = Adw.HeaderBar()
         header.pack_start(sidebar_button)
         header.pack_start(new_tab_button)
+        # A visible way to find the palette again if its shortcut is forgotten.
+        self._palette_button = Gtk.Button(icon_name="shellac-command-symbolic")
+        self._palette_button.set_action_name("win.command_palette")
+        self._update_palette_tooltip()
+        header.pack_end(self._palette_button)
 
         self._toasts = Adw.ToastOverlay()
         self._toasts.set_child(self._tab_view)
@@ -162,6 +168,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._config = config
         self._theme = theme
         self._tab_bar.set_autohide(config.tabs.autohide)
+        self._update_palette_tooltip()
         if self._palette is not None:
             self._palette.set_bindings(self._application_bindings())
         self._sidebar.apply_config(config.sidebar)
@@ -316,6 +323,11 @@ class MainWindow(Adw.ApplicationWindow):
         self.add_action(action)
 
     # -- command palette -----------------------------------------------------------------
+
+    def _update_palette_tooltip(self) -> None:
+        accels = self._application_bindings().get("command_palette", [])
+        shortcut = f" ({' + '.join(accelerator_tokens(accels[0]))})" if accels else ""
+        self._palette_button.set_tooltip_text(f"Command palette{shortcut}")
 
     def _application_bindings(self) -> dict[str, list[str]]:
         app = self.get_application()
