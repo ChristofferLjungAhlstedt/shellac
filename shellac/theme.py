@@ -290,7 +290,8 @@ def _palette_css(theme: Theme) -> str:
   font-weight: 700;
   letter-spacing: 0.08em;
   opacity: 0.55;
-  margin: 14px 18px 4px 18px;
+  padding: 16px 18px 6px 18px;
+  min-height: 1.4em;
 }}
 
 .shellac-palette .keycap {{
