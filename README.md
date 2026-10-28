@@ -34,7 +34,10 @@ know, with a few things added.
   for the same command, or restore the default. Changes are written to `config.toml`.
 - **Live configuration.** Edit `config.toml` or a theme and every window updates at once.
   A mistake never breaks a running window.
-- **Search and links.** Search the scrollback with highlighting, and Ctrl+click URLs.
+- **Search and links.** Search the scrollback with highlighting. Click a URL to open it in your
+  browser (or switch to Ctrl+click with `link_activation = "ctrl_click"`).
+- **Right-click menu.** Copy (when text is selected), paste, select all, open or copy a link,
+  split, zoom or close the pane, search, and the command palette.
 - **Configurable file actions.** Clicking a file can open your editor, run a command, run the
   file, paste its path or open it with the desktop, per extension if you like.
 - **Remembers your layout.** Window size, sidebar visibility and width.
@@ -119,7 +122,7 @@ Everything uses Ctrl+Shift or Ctrl+Alt, so nothing collides with your shell's sh
 | Resize the pane | `Ctrl+Shift+Alt+Arrows` |
 | New tab / next / previous | `Ctrl+Shift+T` / `Ctrl+PageDown` / `Ctrl+PageUp` |
 | Jump to tab 1 to 9 | `Alt+1` to `Alt+9` |
-| Copy / paste | `Ctrl+Shift+C` / `Ctrl+Shift+V` |
+| Copy / paste / select all | `Ctrl+Shift+C` / `Ctrl+Shift+V` / `Ctrl+Shift+A` |
 | Search the scrollback | `Ctrl+Shift+F` |
 | Font zoom in / out / reset | `Ctrl+plus` / `Ctrl+minus` / `Ctrl+0` |
 | Command palette (all shortcuts, editable) | `Ctrl+Shift+Space` |
@@ -235,6 +238,7 @@ through nested shells such as `ssh`.
 | New splits open in `~` | add the [shell integration](#shell-integration) |
 | Prompt shows boxes instead of symbols | use a Nerd Font as `font_family` |
 | Starting it again does nothing | shellac is single-instance: it brings the running window forward |
+| A program using the mouse (vim, tmux) also gets your right-click | the menu opens next to the program's own reaction; set `context_menu = false` to turn the menu off |
 | Want debug output | `shellac --debug` |
 
 ## Development
