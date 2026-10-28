@@ -1,8 +1,8 @@
 <h1 align="center">Shellac</h1>
 
 <p align="center">
-  A Linux terminal emulator with split panes, tabs<br>
-  and a file tree sidebar.
+  A good-looking Linux terminal emulator with fast pane splitting<br>
+  and a file tree that follows you around.
 </p>
 
 <p align="center">
