@@ -111,7 +111,7 @@ class TerminalPane:
         self._context_menu = config.general.context_menu
         self._press: tuple[float, float] | None = None  # surface position of the button press
         self._menu_uri: str | None = None
-        self._popover: Gtk.PopoverMenu | None = None
+        self._popover: Gtk.Popover | None = None
         self._setup_links()
         self._setup_context_menu()
 
@@ -267,30 +267,66 @@ class TerminalPane:
         if self._menu_uri:
             self.terminal.get_clipboard().set(self._menu_uri)
 
-    def _build_menu(self, uri: str | None) -> Gio.Menu:
-        menu = Gio.Menu()
+    def _menu_sections(self, uri: str | None) -> list[list[tuple[str, str]]]:
+        """The menu as (label, action) groups; each group is separated by a line."""
+        sections: list[list[tuple[str, str]]] = []
         if uri is not None:
-            links = Gio.Menu()
-            links.append("Open Link", "term.open-link")
-            links.append("Copy Link Address", "term.copy-link")
-            menu.append_section(None, links)
-        clipboard = Gio.Menu()
+            sections.append(
+                [("Open Link", "term.open-link"), ("Copy Link Address", "term.copy-link")]
+            )
+        clipboard = [("Paste", "win.paste"), ("Select All", "win.select_all")]
         if self.terminal.get_has_selection():
-            clipboard.append("Copy", "win.copy")
-        clipboard.append("Paste", "win.paste")
-        clipboard.append("Select All", "win.select_all")
-        menu.append_section(None, clipboard)
-        panes = Gio.Menu()
-        panes.append("Split Right", "win.split_right")
-        panes.append("Split Down", "win.split_down")
-        panes.append("Zoom Pane", "win.zoom_pane")
-        panes.append("Close Pane", "win.close_pane")
-        menu.append_section(None, panes)
-        tools = Gio.Menu()
-        tools.append("Search…", "win.search")
-        tools.append("Command Palette", "win.command_palette")
-        menu.append_section(None, tools)
-        return menu
+            clipboard.insert(0, ("Copy", "win.copy"))
+        sections.append(clipboard)
+        sections.append(
+            [
+                ("Split Right", "win.split_right"),
+                ("Split Down", "win.split_down"),
+                ("Zoom Pane", "win.zoom_pane"),
+                ("Close Pane", "win.close_pane"),
+            ]
+        )
+        sections.append([("Search…", "win.search"), ("Command Palette", "win.command_palette")])
+        return sections
+
+    def _shortcut_label(self, action: str) -> str:
+        root = self.terminal.get_root()
+        app = root.get_application() if root is not None else None
+        accels = app.get_accels_for_action(action) if app is not None else []
+        if not accels:
+            return ""
+        ok, key, mods = Gtk.accelerator_parse(accels[0])
+        return Gtk.accelerator_get_label(key, mods) if ok else ""
+
+    def _build_popover(self, uri: str | None) -> Gtk.Popover:
+        """A plain popover (not a PopoverMenu): it never scrolls, it shows every entry."""
+        popover = Gtk.Popover(has_arrow=False)
+        popover.add_css_class("menu")
+        column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        column.set_margin_top(4)
+        column.set_margin_bottom(4)
+        column.set_margin_start(4)
+        column.set_margin_end(4)
+        for number, section in enumerate(self._menu_sections(uri)):
+            if number:
+                separator = Gtk.Separator(margin_top=3, margin_bottom=3)
+                column.append(separator)
+            for label, action in section:
+                row = Gtk.Box(spacing=24)
+                name = Gtk.Label(label=label, xalign=0.0, hexpand=True)
+                row.append(name)
+                accel = self._shortcut_label(action)
+                if accel:
+                    hint = Gtk.Label(label=accel, xalign=1.0)
+                    hint.add_css_class("dim-label")
+                    row.append(hint)
+                button = Gtk.Button(child=row)
+                button.add_css_class("flat")
+                button.set_action_name(action)
+                button.connect("clicked", lambda *_, p=popover: p.popdown())
+                column.append(button)
+        popover.set_child(column)
+        return popover
 
     def _handle_right_click(
         self, _gesture: Gtk.GestureClick, _presses: int, x: float, y: float
@@ -300,16 +336,19 @@ class TerminalPane:
         uri = self.uri_at(x, y)
         self._menu_uri = uri if uri and is_openable(uri) else None
         self._close_popover()
-        popover = Gtk.PopoverMenu.new_from_model(self._build_menu(self._menu_uri))
+        popover = self._build_popover(self._menu_uri)
         popover.set_parent(self.terminal)
-        popover.set_has_arrow(False)
+        popover.set_position(Gtk.PositionType.BOTTOM)
         popover.set_halign(Gtk.Align.START)
-        popover.set_pointing_to(Gdk.Rectangle(x=int(x), y=int(y), width=1, height=1))
+        # Gdk.Rectangle(x=..., y=...) silently gives (0, 0) through PyGObject; set the fields.
+        rect = Gdk.Rectangle()
+        rect.x, rect.y, rect.width, rect.height = int(x), int(y), 1, 1
+        popover.set_pointing_to(rect)
         popover.connect("closed", lambda p: GLib.idle_add(self._drop_popover, p))
         self._popover = popover
         popover.popup()
 
-    def _drop_popover(self, popover: Gtk.PopoverMenu) -> bool:
+    def _drop_popover(self, popover: Gtk.Popover) -> bool:
         if popover.get_parent() is not None:
             popover.unparent()
         if self._popover is popover:
