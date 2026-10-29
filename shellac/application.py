@@ -20,6 +20,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_ID  # noqa: E402
 from .config import Config, config_dir, config_path, load_config, user_themes_dir  # noqa: E402
+from .config_edit import save_setting_changes  # noqa: E402
 from .file_tree import register_icons  # noqa: E402
 from .keybinding_edit import save_binding_changes  # noqa: E402
 from .keybindings import ACCELERATOR_ALIASES, all_bindings  # noqa: E402
@@ -69,6 +70,7 @@ IMPLEMENTED_ACTIONS = (
     "zoom_out",
     "zoom_reset",
     "command_palette",
+    "settings",
 )
 ACTION_TARGETS: dict[str, str] = {name: f"win.{name}" for name in IMPLEMENTED_ACTIONS}
 
@@ -100,6 +102,7 @@ class Application(Adw.Application):
         self._monitors: list[Gio.FileMonitor] = []
         self._reload_source = 0
         self._reload_keeps_override = True
+        self._preview_saved: tuple[str | None, str] | None = None  # override before a preview
 
     # -- lifecycle ----------------------------------------------------------------------
 
@@ -272,6 +275,46 @@ class Application(Adw.Application):
         if error is None:
             self._last_self_write = time.monotonic()
         return error
+
+    def save_settings(self, changes: dict[tuple[str, str], object]) -> str | None:
+        """Write setting changes ({(section, key): value or None}) into the config file.
+
+        A theme previewed in the settings window gives way to the saved one. Returns an error
+        message, or None on success.
+        """
+        error = save_setting_changes(Path(self._config_file or config_path()), changes)
+        if error is not None:
+            return error
+        self._last_self_write = time.monotonic()
+        keys = {key for _section, key in changes}
+        if keys & {"theme", "follow_system_scheme", "dark_theme", "light_theme"}:
+            # The config now decides the theme again, also over an earlier Ctrl+Shift+P pick.
+            self._preview_saved = None
+            self._theme_override = None
+            self._remember_theme()
+        else:
+            self.end_theme_preview()
+        return None
+
+    def preview_theme(self, theme_id: str | None) -> None:
+        """Show ``theme_id`` everywhere without saving it; None goes back to what it was."""
+        if theme_id is None:
+            self.end_theme_preview()
+            return
+        if self._preview_saved is None:
+            self._preview_saved = (self._theme_override, self._override_basis)
+        self._theme_override = theme_id
+        self._override_basis = theme_basis(self.config.appearance)
+        self._resolve_theme()
+        self._apply()
+
+    def end_theme_preview(self) -> None:
+        if self._preview_saved is None:
+            return
+        self._theme_override, self._override_basis = self._preview_saved
+        self._preview_saved = None
+        self._resolve_theme()
+        self._apply()
 
     def keybindings(self) -> dict[str, list[str]]:
         return all_bindings(self.config.keybindings, self.config.extra_bindings)
