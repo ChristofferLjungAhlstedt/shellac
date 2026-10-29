@@ -172,8 +172,11 @@ class CommandPalette(Adw.Window):
 
     # -- public ---------------------------------------------------------------------------
 
-    def open(self) -> None:
+    def open(self, *, edit: bool = False) -> None:
+        """Show the palette; ``edit`` opens it straight in the shortcut editor."""
         self.present()
+        if edit and not self._editing:
+            self._enter_mode(True)
         self._search.grab_focus()
 
     def set_bindings(self, bindings: dict[str, list[str]]) -> None:
