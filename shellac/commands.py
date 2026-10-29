@@ -46,6 +46,7 @@ COMMANDS: tuple[Command, ...] = (
     Command("select_all", "Select all", "Select the whole scrollback", "Clipboard and search"),
     Command("search", "Search", "Search the scrollback", "Clipboard and search"),
     Command("reload_config", "Reload configuration", "Re-read config and themes", "General"),
+    Command("settings", "Settings", "Change how Shellac looks and behaves", "General"),
     Command("command_palette", "Command palette", "This window", "General"),
 )
 
