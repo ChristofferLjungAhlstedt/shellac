@@ -53,6 +53,7 @@ class MainWindow(Adw.ApplicationWindow):
             self.maximize()
         self.add_css_class("shellac")
         self._config = config
+        self._saved_config = config
         self._theme = theme
         self._containers: dict[Adw.TabPage, PaneContainer] = {}
         self._follow_timer = 0
@@ -166,12 +167,13 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- config -------------------------------------------------------------------------
 
-    def apply_config(self, config: Config, theme: Theme) -> None:
+    def apply_config(self, config: Config, theme: Theme, saved: Config | None = None) -> None:
         """Apply a new config and theme to every pane in every tab at once (FR-38, FR-46).
 
         New tabs and panes created afterwards use these too.
         """
         self._config = config
+        self._saved_config = saved or config  # without any live preview from the settings
         self._theme = theme
         self._tab_bar.set_autohide(config.tabs.autohide)
         self._update_palette_tooltip()
@@ -179,7 +181,8 @@ class MainWindow(Adw.ApplicationWindow):
         if self._palette is not None:
             self._palette.set_bindings(self._application_bindings())
         if self._settings is not None:
-            self._settings.set_config(config)
+            self._settings.set_config(self._saved_config)
+            self._settings.sync_active_theme()
         self._sidebar.apply_config(config.sidebar)
         self._sidebar.set_show_hidden(config.sidebar.show_hidden)
         for container in self._containers.values():
@@ -357,9 +360,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self._settings is None:
             self._settings = SettingsWindow(
                 self,
-                self._config,
+                self._saved_config,
                 on_save=app.save_settings,
                 on_preview=app.preview_theme,
+                on_preview_appearance=app.preview_appearance,
+                active_theme=app.active_theme,
                 on_open_shortcuts=lambda: self.open_palette(edit=True),
             )
         self._settings.open(page)
