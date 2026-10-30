@@ -7,6 +7,7 @@ which pushes it to every pane, so a theme or config change updates everything at
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import time
 from pathlib import Path
@@ -91,7 +92,9 @@ class Application(Adw.Application):
 
         # Real values are set in do_startup, once Adwaita is initialised and the system
         # color scheme can be queried.
-        self.config = Config()
+        self.config = Config()  # in effect: the file plus any live preview
+        self._disk_config = Config()  # what the file says
+        self._appearance_preview: dict[str, object] | None = None
         self.theme: Theme
         self.warnings: list[str] = []
 
@@ -140,11 +143,18 @@ class Application(Adw.Application):
     def _load_config(self) -> None:
         """Read the config file and pick the theme. Never raises (FR-45)."""
         result = load_config(self._config_file)
-        self.config = result.config
+        self._disk_config = result.config
+        self.config = self._with_preview(result.config)
         self.warnings = list(result.warnings)
         self._resolve_theme()
         for warning in self.warnings:
             log.warning("config: %s", warning)
+
+    def _with_preview(self, config: Config) -> Config:
+        if not self._appearance_preview:
+            return config
+        appearance = dataclasses.replace(config.appearance, **self._appearance_preview)
+        return dataclasses.replace(config, appearance=appearance)
 
     def _restore_saved_theme(self) -> None:
         """Bring back the theme picked in the last session, if the config still agrees."""
@@ -187,7 +197,7 @@ class Application(Adw.Application):
         self._apply_chrome()
         for window in self.get_windows():
             if isinstance(window, MainWindow):
-                window.apply_config(self.config, self.theme)
+                window.apply_config(self.config, self.theme, self._disk_config)
 
     def _apply_chrome(self) -> None:
         """Load the theme's CSS at display level and pick light/dark (section 8.6)."""
@@ -286,6 +296,7 @@ class Application(Adw.Application):
         if error is not None:
             return error
         self._last_self_write = time.monotonic()
+        self._appearance_preview = None  # the file now has these values; the reload follows
         keys = {key for _section, key in changes}
         if keys & {"theme", "follow_system_scheme", "dark_theme", "light_theme"}:
             # The config now decides the theme again, also over an earlier Ctrl+Shift+P pick.
@@ -307,6 +318,21 @@ class Application(Adw.Application):
         self._override_basis = theme_basis(self.config.appearance)
         self._resolve_theme()
         self._apply()
+
+    def preview_appearance(self, overrides: dict[str, object] | None) -> None:
+        """Show appearance settings (font, opacity, cursor, ...) without saving them.
+
+        ``overrides`` maps appearance option names to values; None or empty goes back to the
+        config file's values. The theme itself is previewed with ``preview_theme``.
+        """
+        self._appearance_preview = dict(overrides) if overrides else None
+        self.config = self._with_preview(self._disk_config)
+        self._resolve_theme()
+        self._apply()
+
+    def active_theme(self) -> tuple[str, bool]:
+        """The theme in effect, and whether it follows the system color scheme."""
+        return self.theme.id, self._following_system()
 
     def end_theme_preview(self) -> None:
         if self._preview_saved is None:
