@@ -51,6 +51,30 @@ def _is_monospace(item: Any) -> bool:
     return bool(family.is_monospace())
 
 
+_OWN_SPIN_ICONS = {
+    "value-increase-symbolic": "shellac-plus-symbolic",
+    "value-decrease-symbolic": "shellac-minus-symbolic",
+    "list-add-symbolic": "shellac-plus-symbolic",
+    "list-remove-symbolic": "shellac-minus-symbolic",
+}
+
+
+def _use_own_spin_icons(widget: Gtk.Widget) -> None:
+    """Give a spin row's +/- buttons Shellac's own icons.
+
+    The buttons ask the desktop icon theme for ``value-increase-symbolic`` and friends; some
+    themes ship versions of those that draw nothing, so the buttons look empty.
+    """
+    child = widget.get_first_child()
+    while child is not None:
+        if isinstance(child, Gtk.Image):
+            own = _OWN_SPIN_ICONS.get(child.get_icon_name() or "")
+            if own is not None:
+                child.set_from_icon_name(own)
+        _use_own_spin_icons(child)
+        child = child.get_next_sibling()
+
+
 class SettingsWindow(Adw.Window):
     def __init__(
         self,
@@ -168,15 +192,8 @@ class SettingsWindow(Adw.Window):
 
     def _build_shortcuts(self) -> Gtk.Widget:
         prefs = Adw.PreferencesPage()
-        group = Adw.PreferencesGroup(
-            title="Keybindings",
-            description="Shortcuts are edited in the command palette, beside each command.",
-        )
-        row = Adw.ActionRow(
-            title="Edit shortcuts",
-            subtitle="Click a shortcut, press the new keys, then Save.",
-            activatable=True,
-        )
+        group = Adw.PreferencesGroup(title="Keybindings")
+        row = Adw.ActionRow(title="Edit shortcuts", activatable=True)
         button = Gtk.Button(label="Open the editor", valign=Gtk.Align.CENTER)
         button.add_css_class("suggested-action")
         button.connect("clicked", lambda *_: self._on_open_shortcuts())
@@ -234,6 +251,7 @@ class SettingsWindow(Adw.Window):
         row = Adw.SpinRow(
             title=item.label, subtitle=item.description, adjustment=adjustment, digits=item.digits
         )
+        _use_own_spin_icons(row)
         row.connect("notify::value", lambda r, _p: self._changed(item, r.get_value()))
         return row, lambda value: row.set_value(float(value))
 
@@ -327,9 +345,12 @@ class SettingsWindow(Adw.Window):
             if path not in self._rows:  # still building the pages
                 return
             self._rows[path].set_sensitive(is_enabled(item, self._draft))
-            self._reset_buttons[path].set_visible(
-                coerce(item, self._draft[path]) != coerce(item, default_value(item))
-            )
+            # Hidden, not removed: the button keeps its place so nothing else moves.
+            differs = coerce(item, self._draft[path]) != coerce(item, default_value(item))
+            button = self._reset_buttons[path]
+            button.set_opacity(1.0 if differs else 0.0)
+            button.set_can_target(differs)
+            button.set_can_focus(differs)
         count = len(self._changes())
         if count:
             noun = "change" if count == 1 else "changes"
