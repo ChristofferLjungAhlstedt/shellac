@@ -286,7 +286,13 @@ class TerminalPane:
                 ("Close Pane", "win.close_pane"),
             ]
         )
-        sections.append([("Search…", "win.search"), ("Command Palette", "win.command_palette")])
+        sections.append(
+            [
+                ("Search…", "win.search"),
+                ("Command Palette", "win.command_palette"),
+                ("Settings", "win.settings"),
+            ]
+        )
         return sections
 
     def _shortcut_label(self, action: str) -> str:
