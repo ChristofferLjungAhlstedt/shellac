@@ -32,6 +32,7 @@ from .settings_schema import (  # noqa: E402
     TEXT,
     THEME,
     Field,
+    all_fields,
     changes_from_draft,
     coerce,
     default_value,
@@ -42,6 +43,7 @@ from .settings_schema import (  # noqa: E402
 from .theme import get_theme, theme_ids  # noqa: E402
 
 Path = tuple[str, str]
+THEME_PATH: Path = ("appearance", "theme")
 SIZE = (860, 680)
 
 
@@ -83,6 +85,8 @@ class SettingsWindow(Adw.Window):
         *,
         on_save: Callable[[dict[Path, Any]], str | None],
         on_preview: Callable[[str | None], None],
+        on_preview_appearance: Callable[[dict[str, Any] | None], None],
+        active_theme: Callable[[], tuple[str, bool]],
         on_open_shortcuts: Callable[[], None],
     ) -> None:
         super().__init__(title="Settings", transient_for=parent, modal=False, hide_on_close=True)
@@ -90,8 +94,11 @@ class SettingsWindow(Adw.Window):
         self.set_default_size(*SIZE)
         self._on_save = on_save
         self._on_preview = on_preview
+        self._on_preview_appearance = on_preview_appearance
+        self._active_theme = active_theme
         self._on_open_shortcuts = on_open_shortcuts
         self._saved = values_from_config(config)
+        self._saved[THEME_PATH] = self._effective_theme(config)
         self._draft = dict(self._saved)
         self._syncing = False
         self._leaving = False
@@ -329,14 +336,46 @@ class SettingsWindow(Adw.Window):
                 self._setters[path](value)
             finally:
                 self._syncing = False
-        if path == ("appearance", "theme"):
+        if path == THEME_PATH:
             self._preview_theme()
+        if path[0] == "appearance":
+            self._preview_appearance()
         self._refresh()
 
     def _preview_theme(self) -> None:
-        item_path = ("appearance", "theme")
-        chosen = self._draft[item_path]
-        self._on_preview(None if chosen == self._saved[item_path] else chosen)
+        chosen = self._draft[THEME_PATH]
+        self._on_preview(None if chosen == self._saved[THEME_PATH] else chosen)
+
+    def _preview_appearance(self) -> None:
+        """Show every changed appearance option right away (nothing is saved)."""
+        known = {f.path: f for f in all_fields()}
+        shown = {
+            path[1]: coerce(known[path], value)
+            for path, value in self._draft.items()
+            if path[0] == "appearance"
+            and path != THEME_PATH
+            and coerce(known[path], value) != coerce(known[path], self._saved[path])
+        }
+        self._on_preview_appearance(shown or None)
+
+    def sync_active_theme(self) -> None:
+        """Make the theme row show the theme in effect, e.g. after Ctrl+Shift+P cycled it.
+
+        While following the system color scheme the row keeps showing the configured theme.
+        """
+        theme_id, following = self._active_theme()
+        if following:
+            return
+        if theme_id == self._draft[THEME_PATH]:
+            return  # nothing changed, or this is the preview of the row's own choice
+        # The theme changed from outside (Ctrl+Shift+P, or a preview just ended): follow it.
+        self._saved[THEME_PATH] = self._draft[THEME_PATH] = theme_id
+        self._syncing = True
+        try:
+            self._setters[THEME_PATH](theme_id)
+        finally:
+            self._syncing = False
+        self._refresh()
 
     def _refresh(self) -> None:
         """Update which rows are usable, the per-row reset buttons and the footer."""
@@ -365,10 +404,19 @@ class SettingsWindow(Adw.Window):
         for path, value in defaults().items():
             self._set(path, value)
 
+    def _effective_theme(self, config: Config) -> str:
+        theme_id, following = self._active_theme()
+        return config.appearance.theme if following else theme_id
+
     def set_config(self, config: Config) -> None:
         """The config on disk changed (a save landed, or the file was edited elsewhere)."""
         was_dirty = self._dirty()
+        previous = self._saved.get(THEME_PATH)
         self._saved = values_from_config(config)
+        if previous is not None and not self._active_theme()[1]:
+            # Not following the system: the row's baseline is the theme in effect, which
+            # ``sync_active_theme`` keeps up to date. A preview must not move it.
+            self._saved[THEME_PATH] = previous
         if not was_dirty:
             self._draft = dict(self._saved)
             self._syncing = True
@@ -390,6 +438,8 @@ class SettingsWindow(Adw.Window):
         finally:
             self._syncing = False
         self._on_preview(None)
+        self._on_preview_appearance(None)
+        self.sync_active_theme()
         self._refresh()
 
     def _cancel_clicked(self) -> None:
