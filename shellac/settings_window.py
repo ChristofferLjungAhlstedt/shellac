@@ -45,6 +45,12 @@ Path = tuple[str, str]
 SIZE = (860, 680)
 
 
+def _is_monospace(item: Any) -> bool:
+    """Font dialog filter. At family level the items are families, otherwise faces."""
+    family = item if hasattr(item, "is_monospace") else item.get_family()
+    return bool(family.is_monospace())
+
+
 class SettingsWindow(Adw.Window):
     def __init__(
         self,
@@ -269,7 +275,7 @@ class SettingsWindow(Adw.Window):
     def _font_row(self, item: Field) -> tuple[Adw.PreferencesRow, Callable[[Any], None]]:
         row = Adw.ActionRow(title=item.label, subtitle=item.description)
         dialog = Gtk.FontDialog(title="Choose a font")
-        dialog.set_filter(Gtk.CustomFilter.new(lambda face: face.get_family().is_monospace()))
+        dialog.set_filter(Gtk.CustomFilter.new(_is_monospace))
         button = Gtk.FontDialogButton(
             dialog=dialog, valign=Gtk.Align.CENTER, level=Gtk.FontLevel.FAMILY
         )
