@@ -39,6 +39,7 @@ DEFAULT_KEYBINDINGS: dict[str, str] = {
     "cycle_theme": "<Ctrl><Shift>p",
     "reload_config": "<Ctrl><Shift>r",
     "command_palette": "<Ctrl><Shift>space",
+    "settings": "<Ctrl>comma",
 }
 
 # Extra accelerators bound next to the configured one. "plus" needs Shift on most layouts,
