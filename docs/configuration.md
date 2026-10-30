@@ -41,7 +41,7 @@ font_size = 12
 opacity = 0.95           # terminal background only, never the text
 padding = 8
 cursor_shape = "block"   # block | ibeam | underline
-cursor_blink = false
+cursor_blink = true
 zoom_scope = "pane"      # pane | window: what Ctrl+plus / Ctrl+minus resize
 zoom_step = 0.1
 
@@ -108,6 +108,7 @@ at (for example `keybindings = { ... }` as an inline table) it asks you to edit 
 | `zoom_in`, `zoom_out`, `zoom_reset` | `<Ctrl>plus`, `<Ctrl>minus`, `<Ctrl>0` | font size |
 | `cycle_theme`, `reload_config` | `<Ctrl><Shift>p`, `<Ctrl><Shift>r` | themes and config |
 | `command_palette` | `<Ctrl><Shift>space` | open the command palette |
+| `settings` | `<Ctrl>comma` | open the settings window |
 | `toggle_sidebar`, `focus_sidebar` | `<Ctrl><Shift>b`, `<Ctrl><Alt>b` | sidebar |
 
 ## Sidebar file activation
@@ -140,6 +141,22 @@ start). Copy one of the bundled files from the installed package as a template: 
 colors, a 16-entry `palette`, and `ui` colors for the chrome. A user theme with the same
 file name as a bundled one replaces it. With `follow_system_scheme = true`, `dark_theme` or
 `light_theme` is chosen by the desktop's dark/light preference and changes when it does.
+
+## The settings window
+
+`Ctrl+,` (or the gear in the title bar) opens a window with Appearance, Terminal and Sidebar
+pages, plus a Keybindings page that opens the shortcut editor. Changes are a draft: Save writes
+them, Cancel drops them, Reset puts every default into the draft, and closing with unsaved
+changes asks first. The exception is the Appearance page: its options (theme, font,
+opacity, cursor, spacing and so on) are previewed live while you change them, but only written
+on Save; Cancel puts the saved look back. The theme row also follows the theme in effect, so
+switching with `Ctrl+Shift+P` while the window is open updates it.
+
+Saving edits only the lines that changed, so comments and your own layout survive. A value
+equal to the default removes its line, and a table left empty disappears. Options that are
+not in the window (window size, `always_show`, `[sidebar.open_with]`, `confirm_close_running`)
+stay in the file. If the file uses a layout the window will not guess at, such as
+`appearance = { ... }` on one line, it asks you to edit the file by hand instead.
 
 ## Live reload
 

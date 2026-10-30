@@ -63,7 +63,7 @@ class AppearanceConfig:
     pane_spacing: int = 1
     focus_indicator: str = "border"  # border | dim | none
     cursor_shape: str = "block"  # block | ibeam | underline
-    cursor_blink: bool = False
+    cursor_blink: bool = True
     zoom_scope: str = "pane"  # pane | window: what Ctrl+plus / Ctrl+minus resize (FR-8)
     zoom_step: float = 0.1  # font scale change per step
 

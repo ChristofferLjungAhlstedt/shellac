@@ -361,6 +361,15 @@ popover.menu button.flat {{
   background-color: alpha(currentColor, 0.03);
 }}
 
+.shellac-settings .settings-footer {{
+  border-top: 1px solid alpha(currentColor, 0.1);
+  background-color: alpha(currentColor, 0.03);
+}}
+
+.shellac-settings .settings-nav {{
+  background-color: alpha(currentColor, 0.03);
+}}
+
 .shellac-palette .add-binding {{
   opacity: 0.6;
 }}

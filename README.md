@@ -32,12 +32,16 @@ and live-reloaded TOML configuration, in a native desktop application.
 - **Command palette.** A compact window listing every command with its shortcuts, searchable
   and runnable. The pen button makes the shortcuts editable: change one, add a second shortcut
   for the same command, or restore the default. Changes are written to `config.toml`.
+- **Settings window.** The common options (theme with live preview, font, opacity, cursor,
+  links, shell, sidebar behavior) in one window, opened with `Ctrl+,` or the gear button.
+  Appearance changes show instantly as a preview and nothing is saved until you press Save;
+  only the lines you changed are written to `config.toml`, and your comments stay where they are.
 - **Live configuration.** Edit `config.toml` or a theme and every window updates at once.
   A mistake never breaks a running window.
 - **Search and links.** Search the scrollback with highlighting. Click a URL to open it in your
   browser (or switch to Ctrl+click with `link_activation = "ctrl_click"`).
 - **Right-click menu.** Copy (when text is selected), paste, select all, open or copy a link,
-  split, zoom or close the pane, search, and the command palette.
+  split, zoom or close the pane, search, the command palette and settings.
 - **Configurable file actions.** Clicking a file can open your editor, run a command, run the
   file, paste its path or open it with the desktop, per extension if you like.
 - **Persistent window state.** Window size, sidebar visibility and sidebar width are restored on start.
@@ -126,6 +130,7 @@ Everything uses Ctrl+Shift or Ctrl+Alt, so nothing collides with your shell's sh
 | Search the scrollback | `Ctrl+Shift+F` |
 | Font zoom in / out / reset | `Ctrl+plus` / `Ctrl+minus` / `Ctrl+0` |
 | Command palette (all shortcuts, editable) | `Ctrl+Shift+Space` |
+| Settings | `Ctrl+,` |
 | Cycle theme | `Ctrl+Shift+P` |
 | Reload configuration | `Ctrl+Shift+R` |
 | Show or hide the sidebar | `Ctrl+Shift+B` |
@@ -180,8 +185,9 @@ command, running the file, or choosing the action per extension.
 
 ## Configuration
 
-Settings live in `~/.config/shellac/config.toml`. Every setting has a default, so the file
-can be tiny, or missing. A short example:
+Most options can be changed in the settings window (`Ctrl+,`). They live in
+`~/.config/shellac/config.toml`, which you can also edit by hand. Every setting has a default,
+so the file can be tiny, or missing. A short example:
 
 ```toml
 [appearance]

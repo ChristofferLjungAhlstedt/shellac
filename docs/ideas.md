@@ -9,8 +9,8 @@ being built; the rest are candidates, in no fixed order.
   every command with its shortcuts. A pen button enlarges it and makes the shortcuts
   editable, including adding a second shortcut for the same command. Settings are written
   back to `config.toml` without touching the rest of the file.
-- **GUI settings.** A settings window for the common options, so a newcomer does not have to
-  edit TOML.
+- **GUI settings** (done). A settings window for the common options with a live theme preview,
+  draft/Save/Cancel/Reset and per-option restore, writing only the changed lines to the config.
 
 ## High value
 

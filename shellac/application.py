@@ -7,6 +7,7 @@ which pushes it to every pane, so a theme or config change updates everything at
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import time
 from pathlib import Path
@@ -20,6 +21,7 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_ID  # noqa: E402
 from .config import Config, config_dir, config_path, load_config, user_themes_dir  # noqa: E402
+from .config_edit import save_setting_changes  # noqa: E402
 from .file_tree import register_icons  # noqa: E402
 from .keybinding_edit import save_binding_changes  # noqa: E402
 from .keybindings import ACCELERATOR_ALIASES, all_bindings  # noqa: E402
@@ -69,6 +71,7 @@ IMPLEMENTED_ACTIONS = (
     "zoom_out",
     "zoom_reset",
     "command_palette",
+    "settings",
 )
 ACTION_TARGETS: dict[str, str] = {name: f"win.{name}" for name in IMPLEMENTED_ACTIONS}
 
@@ -89,7 +92,9 @@ class Application(Adw.Application):
 
         # Real values are set in do_startup, once Adwaita is initialised and the system
         # color scheme can be queried.
-        self.config = Config()
+        self.config = Config()  # in effect: the file plus any live preview
+        self._disk_config = Config()  # what the file says
+        self._appearance_preview: dict[str, object] | None = None
         self.theme: Theme
         self.warnings: list[str] = []
 
@@ -100,6 +105,7 @@ class Application(Adw.Application):
         self._monitors: list[Gio.FileMonitor] = []
         self._reload_source = 0
         self._reload_keeps_override = True
+        self._preview_saved: tuple[str | None, str] | None = None  # override before a preview
 
     # -- lifecycle ----------------------------------------------------------------------
 
@@ -137,11 +143,18 @@ class Application(Adw.Application):
     def _load_config(self) -> None:
         """Read the config file and pick the theme. Never raises (FR-45)."""
         result = load_config(self._config_file)
-        self.config = result.config
+        self._disk_config = result.config
+        self.config = self._with_preview(result.config)
         self.warnings = list(result.warnings)
         self._resolve_theme()
         for warning in self.warnings:
             log.warning("config: %s", warning)
+
+    def _with_preview(self, config: Config) -> Config:
+        if not self._appearance_preview:
+            return config
+        appearance = dataclasses.replace(config.appearance, **self._appearance_preview)
+        return dataclasses.replace(config, appearance=appearance)
 
     def _restore_saved_theme(self) -> None:
         """Bring back the theme picked in the last session, if the config still agrees."""
@@ -184,7 +197,7 @@ class Application(Adw.Application):
         self._apply_chrome()
         for window in self.get_windows():
             if isinstance(window, MainWindow):
-                window.apply_config(self.config, self.theme)
+                window.apply_config(self.config, self.theme, self._disk_config)
 
     def _apply_chrome(self) -> None:
         """Load the theme's CSS at display level and pick light/dark (section 8.6)."""
@@ -272,6 +285,62 @@ class Application(Adw.Application):
         if error is None:
             self._last_self_write = time.monotonic()
         return error
+
+    def save_settings(self, changes: dict[tuple[str, str], object]) -> str | None:
+        """Write setting changes ({(section, key): value or None}) into the config file.
+
+        A theme previewed in the settings window gives way to the saved one. Returns an error
+        message, or None on success.
+        """
+        error = save_setting_changes(Path(self._config_file or config_path()), changes)
+        if error is not None:
+            return error
+        self._last_self_write = time.monotonic()
+        self._appearance_preview = None  # the file now has these values; the reload follows
+        keys = {key for _section, key in changes}
+        if keys & {"theme", "follow_system_scheme", "dark_theme", "light_theme"}:
+            # The config now decides the theme again, also over an earlier Ctrl+Shift+P pick.
+            self._preview_saved = None
+            self._theme_override = None
+            self._remember_theme()
+        else:
+            self.end_theme_preview()
+        return None
+
+    def preview_theme(self, theme_id: str | None) -> None:
+        """Show ``theme_id`` everywhere without saving it; None goes back to what it was."""
+        if theme_id is None:
+            self.end_theme_preview()
+            return
+        if self._preview_saved is None:
+            self._preview_saved = (self._theme_override, self._override_basis)
+        self._theme_override = theme_id
+        self._override_basis = theme_basis(self.config.appearance)
+        self._resolve_theme()
+        self._apply()
+
+    def preview_appearance(self, overrides: dict[str, object] | None) -> None:
+        """Show appearance settings (font, opacity, cursor, ...) without saving them.
+
+        ``overrides`` maps appearance option names to values; None or empty goes back to the
+        config file's values. The theme itself is previewed with ``preview_theme``.
+        """
+        self._appearance_preview = dict(overrides) if overrides else None
+        self.config = self._with_preview(self._disk_config)
+        self._resolve_theme()
+        self._apply()
+
+    def active_theme(self) -> tuple[str, bool]:
+        """The theme in effect, and whether it follows the system color scheme."""
+        return self.theme.id, self._following_system()
+
+    def end_theme_preview(self) -> None:
+        if self._preview_saved is None:
+            return
+        self._theme_override, self._override_basis = self._preview_saved
+        self._preview_saved = None
+        self._resolve_theme()
+        self._apply()
 
     def keybindings(self) -> dict[str, list[str]]:
         return all_bindings(self.config.keybindings, self.config.extra_bindings)

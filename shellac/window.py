@@ -22,6 +22,7 @@ from .keybindings import accelerator_tokens  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
 from .search_bar import SearchBar  # noqa: E402
+from .settings_window import SettingsWindow  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
 from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
 from .terminal_actions import cd_command, path_text  # noqa: E402
@@ -52,11 +53,13 @@ class MainWindow(Adw.ApplicationWindow):
             self.maximize()
         self.add_css_class("shellac")
         self._config = config
+        self._saved_config = config
         self._theme = theme
         self._containers: dict[Adw.TabPage, PaneContainer] = {}
         self._follow_timer = 0
         self._state_timer = 0
         self._palette: CommandPalette | None = None
+        self._settings: SettingsWindow | None = None
         self._last_followed: str | None = None
         self._font_scale = 1.0
         self._status_toast: Adw.Toast | None = None
@@ -97,6 +100,10 @@ class MainWindow(Adw.ApplicationWindow):
         self._palette_button.set_action_name("win.command_palette")
         self._update_palette_tooltip()
         header.pack_end(self._palette_button)
+        self._settings_button = Gtk.Button(icon_name="shellac-settings-symbolic")
+        self._settings_button.set_action_name("win.settings")
+        self._update_settings_tooltip()
+        header.pack_end(self._settings_button)
 
         self._toasts = Adw.ToastOverlay()
         self._toasts.set_child(self._tab_view)
@@ -160,17 +167,22 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- config -------------------------------------------------------------------------
 
-    def apply_config(self, config: Config, theme: Theme) -> None:
+    def apply_config(self, config: Config, theme: Theme, saved: Config | None = None) -> None:
         """Apply a new config and theme to every pane in every tab at once (FR-38, FR-46).
 
         New tabs and panes created afterwards use these too.
         """
         self._config = config
+        self._saved_config = saved or config  # without any live preview from the settings
         self._theme = theme
         self._tab_bar.set_autohide(config.tabs.autohide)
         self._update_palette_tooltip()
+        self._update_settings_tooltip()
         if self._palette is not None:
             self._palette.set_bindings(self._application_bindings())
+        if self._settings is not None:
+            self._settings.set_config(self._saved_config)
+            self._settings.sync_active_theme()
         self._sidebar.apply_config(config.sidebar)
         self._sidebar.set_show_hidden(config.sidebar.show_hidden)
         for container in self._containers.values():
@@ -275,6 +287,7 @@ class MainWindow(Adw.ApplicationWindow):
 
         self._add_action("search", self.open_search)
         self._add_action("command_palette", self.open_palette)
+        self._add_action("settings", self.open_settings)
         self._add_action("zoom_in", lambda: self._zoom(+1))
         self._add_action("zoom_out", lambda: self._zoom(-1))
         self._add_action("zoom_reset", lambda: self._zoom(0))
@@ -334,7 +347,29 @@ class MainWindow(Adw.ApplicationWindow):
         app = self.get_application()
         return app.keybindings() if app is not None else {}
 
-    def open_palette(self) -> None:
+    def _update_settings_tooltip(self) -> None:
+        accels = self._application_bindings().get("settings", [])
+        shortcut = f" ({' + '.join(accelerator_tokens(accels[0]))})" if accels else ""
+        self._settings_button.set_tooltip_text(f"Settings{shortcut}")
+
+    def open_settings(self, page: str | None = None) -> None:
+        """Show the settings window (created on first use, then reused)."""
+        app = self.get_application()
+        if app is None:
+            return
+        if self._settings is None:
+            self._settings = SettingsWindow(
+                self,
+                self._saved_config,
+                on_save=app.save_settings,
+                on_preview=app.preview_theme,
+                on_preview_appearance=app.preview_appearance,
+                active_theme=app.active_theme,
+                on_open_shortcuts=lambda: self.open_palette(edit=True),
+            )
+        self._settings.open(page)
+
+    def open_palette(self, edit: bool = False) -> None:
         """Show the command palette (created on first use, then reused)."""
         app = self.get_application()
         if app is None:
@@ -347,7 +382,7 @@ class MainWindow(Adw.ApplicationWindow):
                 on_change=app.save_keybindings,
             )
         self._palette.set_bindings(self._application_bindings())
-        self._palette.open()
+        self._palette.open(edit=edit)
 
     def _run_palette_action(self, action: str) -> None:
         self.present()
@@ -561,6 +596,9 @@ class MainWindow(Adw.ApplicationWindow):
         if self._palette is not None:
             self._palette.destroy()
             self._palette = None
+        if self._settings is not None:
+            self._settings.destroy()
+            self._settings = None
         self._sidebar.close()
         # End every shell so nothing is left running after the window closes (M2 acceptance).
         for container in list(self._containers.values()):
