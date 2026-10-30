@@ -95,7 +95,13 @@ APPEARANCE = Page(
         Group(
             "Theme",
             (
-                _f("appearance", "theme", "Theme", "Previewed live while you choose.", THEME),
+                _f(
+                    "appearance",
+                    "theme",
+                    "Theme",
+                    "Shown right away; saved when you press Save.",
+                    THEME,
+                ),
                 _f(
                     "appearance",
                     "follow_system_scheme",
