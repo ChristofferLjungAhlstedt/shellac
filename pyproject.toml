@@ -33,6 +33,7 @@ testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.ruff]
+extend-exclude = ["tools"]
 line-length = 100
 target-version = "py311"
 
