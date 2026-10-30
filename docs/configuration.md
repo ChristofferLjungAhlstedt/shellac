@@ -147,7 +147,10 @@ file name as a bundled one replaces it. With `follow_system_scheme = true`, `dar
 `Ctrl+,` (or the gear in the title bar) opens a window with Appearance, Terminal and Sidebar
 pages, plus a Keybindings page that opens the shortcut editor. Changes are a draft: Save writes
 them, Cancel drops them, Reset puts every default into the draft, and closing with unsaved
-changes asks first. The theme is the one exception, previewed live while you choose it.
+changes asks first. The exception is the Appearance page: its options (theme, font,
+opacity, cursor, spacing and so on) are previewed live while you change them, but only written
+on Save; Cancel puts the saved look back. The theme row also follows the theme in effect, so
+switching with `Ctrl+Shift+P` while the window is open updates it.
 
 Saving edits only the lines that changed, so comments and your own layout survive. A value
 equal to the default removes its line, and a table left empty disappears. Options that are

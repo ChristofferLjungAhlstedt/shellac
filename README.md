@@ -34,8 +34,8 @@ and live-reloaded TOML configuration, in a native desktop application.
   for the same command, or restore the default. Changes are written to `config.toml`.
 - **Settings window.** The common options (theme with live preview, font, opacity, cursor,
   links, shell, sidebar behavior) in one window, opened with `Ctrl+,` or the gear button.
-  Nothing is applied until you press Save; only the lines you changed are written to
-  `config.toml`, and your comments stay where they are.
+  Appearance changes show instantly as a preview and nothing is saved until you press Save;
+  only the lines you changed are written to `config.toml`, and your comments stay where they are.
 - **Live configuration.** Edit `config.toml` or a theme and every window updates at once.
   A mistake never breaks a running window.
 - **Search and links.** Search the scrollback with highlighting. Click a URL to open it in your

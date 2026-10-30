@@ -89,7 +89,10 @@ and remove the old install with `paneterm --uninstall-desktop` and `pipx uninsta
   loader would reject.
 - `config_edit.py` edits single `key = value` lines (keybindings use it too). A value equal to
   the default removes its line; the result is re-parsed with `tomllib` before it is written.
-- The theme is previewed through a temporary runtime override (`Application.preview_theme`), so
-  Cancel returns to the previous theme and Save hands the decision back to the config.
+- Appearance options are previewed live through an overlay on the loaded config
+  (`Application.preview_appearance`; `config` is what is in effect, `_disk_config` what the file
+  says). The theme uses a temporary runtime override (`preview_theme`), so Cancel returns to the
+  previous look and Save hands the decision back to the config. The theme row’s baseline is the
+  theme in effect, which is why cycling themes with the keybinding moves the row.
 - Not offered: window size, sidebar visibility and width (remembered state), `always_show`,
   `[sidebar.open_with]`, and `confirm_close_running` (not implemented yet).
