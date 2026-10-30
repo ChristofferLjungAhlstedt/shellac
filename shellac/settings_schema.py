@@ -193,7 +193,12 @@ TERMINAL = Page(
                     "Empty uses your login shell.",
                     placeholder="/bin/bash",
                 ),
-                _f("general", "login_shell", "Start as a login shell"),
+                _f(
+                    "general",
+                    "login_shell",
+                    "Start as a login shell",
+                    "Reads your login files (such as ~/.profile). New terminals only.",
+                ),
                 _f(
                     "general",
                     "scrollback_lines",
@@ -226,7 +231,12 @@ TERMINAL = Page(
                     "Off passes right-clicks to programs.",
                 ),
                 _f("general", "search_case_sensitive", "Case-sensitive search"),
-                _f("general", "search_wrap_around", "Search wraps around"),
+                _f(
+                    "general",
+                    "search_wrap_around",
+                    "Search wraps around",
+                    "After the last match, continue from the first.",
+                ),
                 _f("tabs", "autohide", "Hide the tab bar with one tab"),
                 _f(
                     "panes",
@@ -249,7 +259,14 @@ SIDEBAR = Page(
             "Tree",
             (
                 _f("sidebar", "follow_cwd", "Follow the terminal's directory"),
-                _f("sidebar", "reveal_in_root", "Reveal instead of re-rooting"),
+                _f(
+                    "sidebar",
+                    "reveal_in_root",
+                    "Reveal instead of re-rooting",
+                    "When the terminal enters a folder the tree already shows, scroll to it "
+                    "instead of changing the tree's root.",
+                    needs=("sidebar", "follow_cwd"),
+                ),
                 _f("sidebar", "show_hidden", "Show hidden files"),
                 _f("sidebar", "hide_gitignored", "Hide ignored files", "Off dims them instead."),
                 _f("sidebar", "git_status", "Show git status"),
@@ -299,6 +316,7 @@ SIDEBAR = Page(
                     "sidebar",
                     "on_dir_activate",
                     "Opening a folder",
+                    "What a double-click or Enter on a folder in the tree does.",
                     labels={"cd": "Change directory", "reroot": "Make it the tree root"},
                 ),
             ),
