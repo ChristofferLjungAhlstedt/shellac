@@ -41,7 +41,7 @@ font_size = 12
 opacity = 0.95           # terminal background only, never the text
 padding = 8
 cursor_shape = "block"   # block | ibeam | underline
-cursor_blink = false
+cursor_blink = true
 zoom_scope = "pane"      # pane | window: what Ctrl+plus / Ctrl+minus resize
 zoom_step = 0.1
 
