@@ -81,3 +81,15 @@ mv ~/.local/state/paneterm ~/.local/state/shellac
 ```
 
 and remove the old install with `paneterm --uninstall-desktop` and `pipx uninstall paneterm`.
+
+## Settings window
+
+- `settings_schema.py` lists the pages and fields and is GTK-free; a test checks every field
+  against the config dataclasses, `ENUMS` and `RANGES`, so the window cannot offer a value the
+  loader would reject.
+- `config_edit.py` edits single `key = value` lines (keybindings use it too). A value equal to
+  the default removes its line; the result is re-parsed with `tomllib` before it is written.
+- The theme is previewed through a temporary runtime override (`Application.preview_theme`), so
+  Cancel returns to the previous theme and Save hands the decision back to the config.
+- Not offered: window size, sidebar visibility and width (remembered state), `always_show`,
+  `[sidebar.open_with]`, and `confirm_close_running` (not implemented yet).
