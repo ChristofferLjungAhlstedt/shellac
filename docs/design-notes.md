@@ -27,8 +27,11 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   pane, so it never changes the pane's size. It only shows while several panes are visible.
 - **Remote shells.** Inside `ssh`, the remote shell's OSC 7 reports its own path. A URI
   naming another host is ignored, so a new split opens in a local directory instead.
-- **Close behavior.** Closing a pane sends its shell SIGHUP. There is no "confirm close
-  while a command is running" prompt yet (`confirm_close_running` is parsed but unused).
+- **Close behavior.** Closing a pane sends its shell SIGHUP. With `confirm_close_running` (on by
+  default) closing a pane, a tab or the window first asks if a command is in the foreground of a
+  pane (see `close_confirm.py`, `TerminalPane.is_running_command`). It asks about the program the
+  terminal reports, so it is a heuristic: background jobs and nested shells are not seen. A pane
+  that exits by itself never asks.
 - **Known cosmetic warning.** Closing a pane programmatically in an unfocused window can log
   a GTK `gtk_paned_set_focus_child` warning. It did not appear with real keypresses in a
   focused window, and has no visible effect.
@@ -60,6 +63,17 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   toggle), so a crash loses little; the cwd of a pane is whatever it was at the last save. When
   the last tab closes because its shell exited, the session is cleared, so exiting every shell
   means a fresh start. Reading is defensive and capped (64 tabs, 64 panes per tab).
+- **Finished-command notifications** (`command_watch.py`, polled from `window.py`). The window
+  samples every pane once a second to see whether a command holds the terminal's foreground (the
+  same check as the close confirmation) and reports one that ran at least
+  `finished_after_seconds`. Polling was chosen over shell integration because the only
+  integration Shellac ships is a zsh snippet (OSC 7), and this works in every shell without
+  setup. The price is that the exit status is unknown and the program name is whatever was last
+  in the foreground. Who is told depends on where you are: a marker on a background tab, a
+  desktop notification only while the window is not active (`attention()`), nothing when you
+  are watching. The tab marker is libadwaita's own "needs attention" indicator and is cleared
+  when the tab is selected. If prompt marks (OSC 133) ever land in VTE, the exit status and exact
+  start and end could replace the polling.
 
 ## Milestones
 
@@ -102,4 +116,4 @@ and remove the old install with `paneterm --uninstall-desktop` and `pipx uninsta
   previous look and Save hands the decision back to the config. The theme row’s baseline is the
   theme in effect, which is why cycling themes with the keybinding moves the row.
 - Not offered: window size, sidebar visibility and width (remembered state), `always_show`,
-  `[sidebar.open_with]`, and `confirm_close_running` (not implemented yet).
+  and `[sidebar.open_with]`.

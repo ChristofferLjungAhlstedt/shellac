@@ -24,7 +24,7 @@ from .shell import (  # noqa: E402
     resolve_shell,
     resolve_working_directory,
 )
-from .terminal_actions import foreground_name, is_shell_idle  # noqa: E402
+from .terminal_actions import foreground_name, is_command_running, is_shell_idle  # noqa: E402
 from .theme import Theme  # noqa: E402
 
 log = logging.getLogger(__name__)
@@ -436,6 +436,16 @@ class TerminalPane:
             return False
         pty = self.terminal.get_pty()
         return pty is not None and is_shell_idle(pty.get_fd(), self.child_pid)
+
+    def is_running_command(self) -> bool:
+        """True when closing this pane would end a program: a command in the shell's
+        foreground, or the single command a pane such as the editor runs."""
+        if self.child_pid is None:
+            return False
+        if not self.runs_shell:
+            return True
+        pty = self.terminal.get_pty()
+        return pty is not None and is_command_running(pty.get_fd(), self.child_pid)
 
     def busy_with(self) -> str | None:
         """Name of what is running in the foreground, for messages."""

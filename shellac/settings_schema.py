@@ -228,6 +228,30 @@ TERMINAL = Page(
             ),
         ),
         Group(
+            "Finished commands",
+            (
+                _f(
+                    "general",
+                    "finished_tab_marker",
+                    "Mark a tab when a command finishes",
+                    "A marker on a background tab whose command has ended.",
+                ),
+                _f(
+                    "general",
+                    "finished_notification",
+                    "Notify me when a command finishes",
+                    "A desktop notification, while Shellac is not the active window.",
+                ),
+                _f(
+                    "general",
+                    "finished_after_seconds",
+                    "Only for commands longer than",
+                    "In seconds. Shorter commands are not reported.",
+                    step=1,
+                ),
+            ),
+        ),
+        Group(
             "Behavior",
             (
                 _f(
@@ -248,6 +272,12 @@ TERMINAL = Page(
                     "restore_session",
                     "Restore the last session",
                     "Reopen your tabs, splits and directories. Programs are not restarted.",
+                ),
+                _f(
+                    "general",
+                    "confirm_close_running",
+                    "Ask before closing a running program",
+                    "Asks when a pane, tab or window has a command running in it.",
                 ),
                 _f("tabs", "autohide", "Hide the tab bar with one tab"),
                 _f(

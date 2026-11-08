@@ -9,7 +9,8 @@ things are the way they are; this file explains how to work on them.
 - The pane tree and all other logic that does not need a widget stays **GTK-free** and
   unit tested: `pane_tree`, `config`, `config_edit`, `settings_schema`, `theme`, `keybindings`,
   `keybinding_edit`, `commands`, `state`, `file_tree_model`, `file_actions`, `git_status`,
-  `links`, `session`, `shell`, `terminal_actions`, `desktop`, `file_icons`, `file_type_icons`.
+  `links`, `session`, `close_confirm`, `command_watch`, `shell`, `terminal_actions`, `desktop`,
+  `file_icons`, `file_type_icons`.
 - Never block the GTK main loop (file system and git work run off the main thread).
 - Every user-visible setting lives in the config, with a default and a validated range or set
   of values (`config.ENUMS`, `config.RANGES`).
@@ -78,13 +79,11 @@ entries if needed), a row in `settings_schema.py` if it belongs in the window, a
 - Not tested on Wayland; the GUI checks run on X11 only.
 - A right-click menu click is also forwarded to programs that use mouse reporting (VTE has no
   getter for that mode).
-- `general.confirm_close_running` exists in the config but does nothing yet.
 - `APP_ID` (`io.github.shellac.Shellac`) is a placeholder until the repository's final home
   is decided; Fedora and Arch package names in the README are unverified.
 - A theme cycled with the keybinding cannot be written to the config from the settings window
   (it is the baseline of the Theme row); pick another theme and back, or edit the file.
-- Roadmap candidates are in `ideas.md` (finished-command notifications, saved layouts,
-  packaging, CI).
+- Roadmap candidates are in `ideas.md` (saved layouts, packaging, CI).
 
 ## Testing the GUI from a sandbox
 

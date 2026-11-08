@@ -45,6 +45,10 @@ and live-reloaded TOML configuration, in a native desktop application.
 - **Configurable file actions.** Clicking a file can open your editor, run a command, run the
   file, paste its path or open it with the desktop, per extension if you like.
 - **Persistent window state.** Window size, sidebar visibility and sidebar width are restored on start.
+- **Session restore.** Reopens your tabs, splits and directories (not running programs).
+- **Safe closing.** Asks before closing a pane, tab or window while a command is running.
+- **Finished commands.** A marker on a background tab, and a desktop notification while the
+  window is away, when a long command ends.
 
 <details>
 <summary>More screenshots</summary>
@@ -270,8 +274,10 @@ Design decisions, milestone history and testing notes are in
 is a plain data structure kept separate from GTK, nothing blocks the GTK main loop, every
 user-visible setting is in the config file, and code is type-hinted and ruff-clean.
 
-Known limits: not yet tested on Wayland; the optional "confirm before closing a running
-shell" prompt is not built.
+Known limits: not yet tested on Wayland. The "something is still running" prompt and the
+finished-command notifications watch the program in the foreground of each pane, so they do
+not see background jobs or a shell started inside a pane, and a notification cannot tell
+whether a command succeeded.
 
 ## License
 
