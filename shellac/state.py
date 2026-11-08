@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import APP_NAME
+from .session import SessionState, session_from_data, session_to_data
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class UiState:
     window_maximized: bool | None = None
     theme: str | None = None  # a theme picked at runtime (Ctrl+Shift+P), None: use the config
     theme_basis: str | None = None  # the config's theme settings when it was picked
+    session: SessionState | None = None  # tabs and layouts to reopen (see session.py)
 
 
 def state_path() -> Path:
@@ -70,6 +72,7 @@ def load_state(path: Path | None = None) -> UiState:
         window_maximized=maximized if isinstance(maximized, bool) else None,
         theme=_text(appearance.get("theme")),
         theme_basis=_text(appearance.get("theme_basis")),
+        session=session_from_data(data.get("session")),
     )
 
 
@@ -104,6 +107,8 @@ def save_state(state: UiState, path: Path | None = None) -> bool:
         document["window"] = window
     if state.theme is not None:
         document["appearance"] = {"theme": state.theme, "theme_basis": state.theme_basis or ""}
+    if state.session is not None:
+        document["session"] = session_to_data(state.session)
     temporary = path.with_suffix(".json.tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

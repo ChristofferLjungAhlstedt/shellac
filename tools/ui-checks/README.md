@@ -9,5 +9,7 @@ not part of `pytest` because they need a display stack.
 Each script prints `CHECK PASS` / `CHECK FAIL` lines and ends with `RESULT ALL PASSED` or a list
 of failures. `settings_window.py` covers the settings window (draft, Save, Cancel, Reset, live
 preview, theme following); `palette_draft.py` covers the command palette's shortcut editor.
-Both run steps on a timer, so a step that needs time to settle (a file reload takes about
+`session_restore.py` covers session restore: it builds tabs and splits, quits, then starts new
+processes on the same state directory to see what comes back (and that a cleared session starts
+fresh). Each runs steps on a timer, so a step that needs time to settle (a file reload takes about
 250 ms) is given a longer delay. New checks are easiest to write by copying one of these.

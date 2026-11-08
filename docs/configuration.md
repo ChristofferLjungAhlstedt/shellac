@@ -15,6 +15,7 @@ User themes go in `~/.config/shellac/themes/*.toml` (see [Themes](#themes)).
 shell = ""               # empty = $SHELL, then /bin/zsh, then /bin/bash
 login_shell = true       # start the shell with -l
 scrollback_lines = 10000
+restore_session = true   # reopen the tabs, splits and directories of the last session
 clickable_urls = true    # clicking a URL in the output opens it
 link_activation = "click"  # click | ctrl_click: what opens a link
 context_menu = true      # right-click menu (copy, paste, select all, splits, link actions)
@@ -157,6 +158,19 @@ equal to the default removes its line, and a table left empty disappears. Option
 not in the window (window size, `always_show`, `[sidebar.open_with]`, `confirm_close_running`)
 stay in the file. If the file uses a layout the window will not guess at, such as
 `appearance = { ... }` on one line, it asks you to edit the file by hand instead.
+
+## Session restore
+
+With `restore_session = true` (the default) Shellac reopens the tabs, split layout, divider
+positions, zoomed pane, focused pane and selected tab of your last session. Each pane starts a
+fresh shell in the directory it was in; running programs are **not** restarted, and scrollback
+is not kept. Panes that run a single command (an editor opened from the sidebar) are left out.
+A directory that no longer exists falls back to your home directory.
+
+The session is kept in `~/.local/state/shellac/state.json`, never in your config, and is
+updated while you work as well as on close. When the last shell exits (you closed every tab),
+the session is cleared and the next start is a single fresh tab. Set `restore_session = false`
+to always start fresh; the saved session is then discarded.
 
 ## Live reload
 

@@ -31,6 +31,8 @@ from .pane_tree import (  # noqa: E402
     Rect,
     Split,
 )
+from .session import TabState, capture_tab, replay  # noqa: E402
+from .shell import resolve_working_directory  # noqa: E402
 from .terminal_pane import TerminalPane  # noqa: E402
 from .theme import Theme  # noqa: E402
 
@@ -98,11 +100,13 @@ class PaneContainer:
         *,
         argv: list[str] | None = None,
         cwd: str | None = None,
+        ratio: float | None = None,
     ) -> TerminalPane | None:
         """Split the focused pane; the new pane starts in the same directory (FR-11..14).
 
         ``argv`` runs that command in the new pane instead of a shell (used to open an
-        editor); ``cwd`` overrides the starting directory.
+        editor); ``cwd`` overrides the starting directory; ``ratio`` sets the share of the
+        first pane instead of 50/50 (used by session restore).
         """
         leaf = self.tree.focused
         if leaf is None or self._shut_down:
@@ -113,6 +117,8 @@ class PaneContainer:
         new_leaf = self.tree.split(leaf, axis, new_pane)
         self._leaf_for_pane[new_pane] = new_leaf
         assert new_leaf.parent is not None
+        if ratio is not None:
+            new_leaf.parent.ratio = min(MAX_RATIO, max(MIN_RATIO, ratio))
         paned = self._make_paned(new_leaf.parent)
 
         # A widget must leave its old parent before joining a new one. Putting the Paned
@@ -126,6 +132,40 @@ class PaneContainer:
         self._update_style()
         self._focus_later(new_pane)
         return new_pane
+
+    def capture(self) -> TabState | None:
+        """Layout and directories for session restore. Panes that run a single command
+        (an editor opened from the sidebar) are not part of it."""
+        return capture_tab(
+            self.tree, lambda pane: pane.current_directory(), lambda pane: pane.runs_shell
+        )
+
+    def restore_layout(self, tab: TabState) -> None:
+        """Rebuild ``tab``'s splits in this container, which still holds its first pane.
+
+        The first pane must have been created in ``first_cwd(tab.layout)``.
+        """
+        root = self.tree.root
+        if not isinstance(root, Leaf) or self._shut_down:
+            return
+
+        def split(leaf: Leaf, axis: Axis, ratio: float, cwd: str | None) -> Leaf:
+            self.tree.set_focus(leaf)
+            self.split(axis, cwd=resolve_working_directory(cwd), ratio=ratio)
+            assert self.tree.focused is not None
+            return self.tree.focused
+
+        replay(tab.layout, root, split)
+        leaves = self.tree.leaves()
+        target = leaves[min(tab.focused, len(leaves) - 1)]
+        if tab.zoomed is not None and tab.zoomed < len(leaves) and len(leaves) > 1:
+            target = leaves[tab.zoomed]  # a zoomed pane is always the focused one
+            self.tree.zoomed = target
+        self.tree.set_focus(target)
+        self._sync_zoom()
+        self._update_style()
+        if self.focused_pane is not None:
+            self._focus_later(self.focused_pane)
 
     def close_pane(self, pane: TerminalPane | None = None) -> None:
         """Close a pane (default: the focused one) and collapse the layout (FR-15)."""
