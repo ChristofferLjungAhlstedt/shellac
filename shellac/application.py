@@ -117,6 +117,10 @@ class Application(Adw.Application):
         self._restore_saved_theme()
         self._apply()
         self._register_accelerators()
+        # Clicking a desktop notification brings the window forward.
+        present = Gio.SimpleAction.new("present-window", None)
+        present.connect("activate", lambda *_args: self.activate())
+        self.add_action(present)
         Adw.StyleManager.get_default().connect("notify::dark", self._on_system_scheme_changed)
         self._watch_files()
 

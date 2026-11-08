@@ -72,6 +72,21 @@ def is_shell_idle(pty_fd: int, shell_pid: int | None) -> bool:
     return foreground_pgid(pty_fd) == shell_pid
 
 
+def is_command_running(pty_fd: int, shell_pid: int | None) -> bool:
+    """Is a command, not the shell's prompt, in the foreground of the terminal?
+
+    The opposite of ``is_shell_idle`` except when it cannot tell (no shell, or the terminal
+    cannot be queried): then it says no, so closing is never blocked by a guess. The same
+    limits apply: a shell started inside the pane looks like the pane's own shell at a
+    prompt, so it counts as idle, and a half-typed line is not seen. ``ssh`` is a command and
+    counts as running.
+    """
+    if shell_pid is None:
+        return False
+    pgid = foreground_pgid(pty_fd)
+    return pgid is not None and pgid != shell_pid
+
+
 def foreground_name(pty_fd: int) -> str | None:
     """Name of the foreground process (for a "pane is busy" message)."""
     pgid = foreground_pgid(pty_fd)

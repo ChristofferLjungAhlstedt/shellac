@@ -16,6 +16,10 @@ shell = ""               # empty = $SHELL, then /bin/zsh, then /bin/bash
 login_shell = true       # start the shell with -l
 scrollback_lines = 10000
 restore_session = true   # reopen the tabs, splits and directories of the last session
+confirm_close_running = true  # ask before closing a pane, tab or window with a command running
+finished_tab_marker = true    # mark a background tab when a long command ends in it
+finished_notification = true  # desktop notification for that while Shellac is not the active window
+finished_after_seconds = 10   # only commands that ran at least this long are reported
 clickable_urls = true    # clicking a URL in the output opens it
 link_activation = "click"  # click | ctrl_click: what opens a link
 context_menu = true      # right-click menu (copy, paste, select all, splits, link actions)
@@ -155,7 +159,7 @@ switching with `Ctrl+Shift+P` while the window is open updates it.
 
 Saving edits only the lines that changed, so comments and your own layout survive. A value
 equal to the default removes its line, and a table left empty disappears. Options that are
-not in the window (window size, `always_show`, `[sidebar.open_with]`, `confirm_close_running`)
+not in the window (window size, `always_show`, `[sidebar.open_with]`)
 stay in the file. If the file uses a layout the window will not guess at, such as
 `appearance = { ... }` on one line, it asks you to edit the file by hand instead.
 
@@ -168,9 +172,39 @@ is not kept. Panes that run a single command (an editor opened from the sidebar)
 A directory that no longer exists falls back to your home directory.
 
 The session is kept in `~/.local/state/shellac/state.json`, never in your config, and is
-updated while you work as well as on close. When the last shell exits (you closed every tab),
+saved when the window closes and whenever the sidebar is toggled or resized. When the last shell exits (you closed every tab),
 the session is cleared and the next start is a single fresh tab. Set `restore_session = false`
 to always start fresh; the saved session is then discarded.
+
+## Closing while something runs
+
+With `confirm_close_running = true` (the default) Shellac asks before it closes a pane, a tab
+(its × button) or the window while a command is running in the foreground of a pane, for
+example `make`, `ssh` or an editor opened from the sidebar. The question names what is running.
+It does not ask when the shell is just sitting at a prompt, or when a program exits by itself
+and its pane closes. A shell started inside a pane (a plain `bash`) looks like the pane's own
+shell and is not counted. Programs running in the background of a shell (`sleep 100 &`) are not
+counted either.
+
+## Finished commands
+
+When a command that ran for at least `finished_after_seconds` (default 10) ends, Shellac tells
+you in the way that fits where you are:
+
+- **Another tab is showing:** the tab gets a marker (`finished_tab_marker`), which clears when
+  you select it.
+- **Shellac is not the active window:** a desktop notification (`finished_notification`) names
+  the command and how long it ran. Clicking it brings the window forward, and it is withdrawn
+  when you come back. If the finished command's tab is not the one showing, it is marked too.
+- **You are looking at it:** nothing, since the output is right there.
+
+It works with any shell and needs no setup: Shellac notices when the program in the foreground
+of a pane's terminal hands it back to the shell. So it reports *that* a command ended and how
+long it ran, but not whether it succeeded, and a shell started inside a pane (a plain `bash`,
+or `ssh` into a machine, whose session counts as one command) is treated like any other
+program. The name shown is the last program seen in the foreground, so a `make` may be reported
+as the compiler it ran last. Commands run in the background of a shell (`sleep 100 &`) are not
+tracked. Set both options to `false` to turn it off.
 
 ## Live reload
 

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import time
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 
@@ -13,7 +15,14 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Adw, Gio, GLib, Gtk  # noqa: E402
 
 from . import APP_TITLE  # noqa: E402
+from .close_confirm import Scope, close_dialog_text  # noqa: E402
 from .command_palette import CommandPalette  # noqa: E402
+from .command_watch import (  # noqa: E402
+    CommandWatch,
+    FinishedCommand,
+    attention,
+    notification_text,
+)
 from .config import Config  # noqa: E402
 from .file_actions import Problem, plan_file_action  # noqa: E402
 from .file_tree import FileTree, register_icons  # noqa: E402
@@ -27,11 +36,13 @@ from .settings_window import SettingsWindow  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
 from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
 from .terminal_actions import cd_command, path_text  # noqa: E402
+from .terminal_pane import TerminalPane  # noqa: E402
 from .theme import Theme  # noqa: E402
 
 MAX_TAB_SHORTCUTS = 9
 FOLLOW_DEBOUNCE_MS = 150  # wait for rapid directory changes to settle (section 8.4)
 FOLLOW_POLL_MS = 1000  # fallback for shells that do not report their directory (OSC 7)
+COMMAND_POLL_MS = 1000  # how often panes are checked for a command that has finished
 STATE_SAVE_DELAY_MS = 400  # after the last sidebar resize
 
 
@@ -64,6 +75,12 @@ class MainWindow(Adw.ApplicationWindow):
         self._last_followed: str | None = None
         self._font_scale = 1.0
         self._status_toast: Adw.Toast | None = None
+        self._watches: weakref.WeakKeyDictionary[TerminalPane, CommandWatch] = (
+            weakref.WeakKeyDictionary()
+        )
+        self._finished_ids: set[str] = set()  # desktop notifications still showing
+        self._confirming_close = False  # a "still running" dialog is open
+        self._close_confirmed = False  # the user agreed to close the window
 
         register_icons()
         self._state = saved
@@ -76,6 +93,7 @@ class MainWindow(Adw.ApplicationWindow):
         self._tab_view.set_shortcuts(Adw.TabViewShortcuts.NONE)
         self._tab_view.connect("notify::selected-page", self._on_selected_page_changed)
         self._tab_view.connect("page-detached", self._on_page_detached)
+        self._tab_view.connect("close-page", self._on_close_page)
 
         self._tab_bar = Adw.TabBar()
         self._tab_bar.set_view(self._tab_view)
@@ -165,6 +183,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         self.connect("map", lambda *_: self._focus_current())
         self._poll_id = GLib.timeout_add(FOLLOW_POLL_MS, self._poll_follow)
+        self._command_poll_id = GLib.timeout_add(COMMAND_POLL_MS, self._poll_commands)
+        self.connect("notify::is-active", self._on_active_changed)
         self._schedule_follow()
 
     # -- config -------------------------------------------------------------------------
@@ -278,9 +298,138 @@ class MainWindow(Adw.ApplicationWindow):
         if container is not None:
             self.set_title(container.title or APP_TITLE)
             self._schedule_follow()
+            self._clear_attention()
             container_pane = container.focused_pane
             if container_pane is not None:
                 container_pane.grab_focus()
+
+    # -- finished commands (general.finished_*) ---------------------------------------------
+
+    def _poll_commands(self) -> bool:
+        general = self._config.general
+        if not (general.finished_tab_marker or general.finished_notification):
+            self._watches.clear()  # turning it on later must not report what ran meanwhile
+            return GLib.SOURCE_CONTINUE
+        now = time.monotonic()
+        for page, container in list(self._containers.items()):
+            for pane in container.panes():
+                if not pane.runs_shell:
+                    continue
+                watch = self._watches.setdefault(pane, CommandWatch())
+                running = pane.is_running_command()
+                finished = watch.update(running, pane.busy_with() if running else None, now)
+                if finished is not None and finished.seconds >= general.finished_after_seconds:
+                    self._command_finished(page, finished)
+        return GLib.SOURCE_CONTINUE
+
+    def _command_finished(self, page: Adw.TabPage, finished: FinishedCommand) -> None:
+        general = self._config.general
+        who = attention(
+            tab_selected=page == self._tab_view.get_selected_page(),
+            window_active=self.is_active(),
+            marker_on=general.finished_tab_marker,
+            notification_on=general.finished_notification,
+        )
+        if who.mark_tab:
+            page.set_needs_attention(True)
+        if who.notify and (app := self.get_application()) is not None:
+            title, body = notification_text(page.get_title(), finished)
+            notification = Gio.Notification.new(title)
+            notification.set_body(body)
+            notification.set_default_action("app.present-window")
+            ident = f"finished-{len(self._finished_ids)}-{int(time.monotonic() * 1000)}"
+            self._finished_ids.add(ident)
+            app.send_notification(ident, notification)
+
+    def _clear_attention(self) -> None:
+        page = self._tab_view.get_selected_page()
+        if page is not None:
+            page.set_needs_attention(False)
+
+    def _on_active_changed(self, *_args: object) -> None:
+        """Coming back to the window: the shown tab is attended to and old popups are stale."""
+        if not self.is_active():
+            return
+        self._clear_attention()
+        app = self.get_application()
+        if app is not None:
+            for ident in self._finished_ids:
+                app.withdraw_notification(ident)
+        self._finished_ids.clear()
+
+    # -- closing with a program running (general.confirm_close_running) --------------------
+
+    def _running_panes(self, panes: list[TerminalPane]) -> list[TerminalPane]:
+        """The panes that closing would end a program in, or none if the setting is off."""
+        if not self._config.general.confirm_close_running:
+            return []
+        return [p for p in panes if p.is_running_command()]
+
+    def _confirm_close(
+        self,
+        scope: Scope,
+        panes: list[TerminalPane],
+        on_yes: Callable[[], None],
+        on_no: Callable[[], None] | None = None,
+    ) -> None:
+        """Run ``on_yes`` now if nothing in ``panes`` is running a command (or the setting is
+        off); otherwise ask first. ``on_no`` runs if the user keeps things open."""
+        running = self._running_panes(panes)
+        if not running:
+            on_yes()
+            return
+        if self._confirming_close:  # one question at a time
+            if on_no is not None:
+                on_no()
+            return
+        heading, body = close_dialog_text(scope, [p.busy_with() for p in running])
+        dialog = Adw.AlertDialog(heading=heading, body=body)
+        dialog.add_response("keep", "Keep open")
+        dialog.add_response("close", "Close")
+        dialog.set_response_appearance("close", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.set_default_response("keep")
+        dialog.set_close_response("keep")
+        self._confirming_close = True
+
+        def answered(_dialog: Adw.AlertDialog, response: str) -> None:
+            self._confirming_close = False
+            if response == "close":
+                on_yes()
+            elif on_no is not None:
+                on_no()
+            self._focus_current()
+
+        dialog.connect("response", answered)
+        dialog.present(self)
+
+    def _close_focused_pane(self) -> None:
+        container = self._current_container()
+        pane = container.focused_pane if container is not None else None
+        if container is None or pane is None:
+            return
+        if len(container.panes()) > 1:
+            scope: Scope = "pane"
+        elif self._tab_view.get_n_pages() > 1:
+            scope = "tab"
+        else:
+            scope = "window"
+        self._confirm_close(scope, [pane], lambda: container.close_pane(pane))
+
+    def _on_close_page(self, view: Adw.TabView, page: Adw.TabPage) -> bool:
+        container = self._containers.get(page)
+        if container is None:
+            return False  # let the tab view close it
+        scope: Scope = "tab" if view.get_n_pages() > 1 else "window"
+        panes = container.panes()
+        if not self._running_panes(panes):
+            return False
+        self._confirm_close(
+            scope,
+            panes,
+            on_yes=lambda: view.close_page_finish(page, True),
+            on_no=lambda: view.close_page_finish(page, False),
+        )
+        return True
 
     def _on_page_detached(self, view: Adw.TabView, page: Adw.TabPage, _position: int) -> None:
         container = self._containers.pop(page, None)
@@ -342,7 +491,7 @@ class MainWindow(Adw.ApplicationWindow):
         # split_down stacks the new pane below (GTK vertical); split_right puts it beside.
         self._add_action("split_down", on_container(lambda c: c.split(Axis.VERTICAL)))
         self._add_action("split_right", on_container(lambda c: c.split(Axis.HORIZONTAL)))
-        self._add_action("close_pane", on_container(lambda c: c.close_pane()))
+        self._add_action("close_pane", self._close_focused_pane)
         self._add_action("zoom_pane", on_container(lambda c: c.toggle_zoom()))
         for direction in Direction:
             self._add_action(
@@ -623,11 +772,20 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- lifecycle ----------------------------------------------------------------------
 
+    def _close_after_confirm(self) -> None:
+        self._close_confirmed = True
+        self.close()
+
     def do_close_request(self) -> bool:
-        for source in (self._follow_timer, self._poll_id):
+        if not self._close_confirmed:
+            panes = [p for c in self._containers.values() for p in c.panes()]
+            if self._running_panes(panes):
+                self._confirm_close("window", panes, on_yes=self._close_after_confirm)
+                return True  # stay open until the user answers
+        for source in (self._follow_timer, self._poll_id, self._command_poll_id):
             if source:
                 GLib.source_remove(source)
-        self._follow_timer = self._poll_id = 0
+        self._follow_timer = self._poll_id = self._command_poll_id = 0
         if self._state_timer:
             GLib.source_remove(self._state_timer)
         self._save_state()  # also remembers the window size

@@ -27,6 +27,9 @@ class GeneralConfig:
     scrollback_lines: int = 10000
     confirm_close_running: bool = True
     restore_session: bool = True  # reopen the tabs, splits and directories of the last session
+    finished_tab_marker: bool = True  # mark a background tab when a long command ends in it
+    finished_notification: bool = True  # desktop notification for that, while the window is away
+    finished_after_seconds: int = 10  # a command must have run this long to be reported
     clickable_urls: bool = True  # a click on a URL in the output opens it (FR-6)
     link_activation: str = "click"  # click | ctrl_click: what opens a link
     context_menu: bool = True  # right-click menu (Shift+right-click in mouse-aware programs)
@@ -141,6 +144,7 @@ ENUMS: dict[tuple[str, str], frozenset[str]] = {
 # Inclusive numeric ranges, keyed by (section, option).
 RANGES: dict[tuple[str, str], tuple[float, float]] = {
     ("general", "scrollback_lines"): (0, 1_000_000),
+    ("general", "finished_after_seconds"): (1, 86_400),
     ("window", "width"): (200, 10_000),
     ("window", "height"): (150, 10_000),
     ("panes", "resize_step"): (1, 1000),

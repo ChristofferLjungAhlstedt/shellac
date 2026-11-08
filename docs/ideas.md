@@ -18,17 +18,14 @@ being built; the rest are candidates, in no fixed order.
   kept in the state file.
 - **Saved layouts / workspaces.** A small TOML file per project describing the splits and the
   command each pane starts with, opened from the sidebar's context menu on a folder.
-- **Finished-command notifications.** A desktop notification or a tab marker when a long
-  command ends in a background pane or tab, using the shell integration to detect the end of a
-  command.
+- **Finished-command notifications** (done). A tab marker or a desktop notification when a long
+  command ends in a background pane or tab, found by watching the pane's foreground process.
 
 ## Splits and tabs
 
 - Broadcast input to several panes at once.
 - Drag a pane to rearrange the layout; rename and color tabs.
 - Swap two panes with a key; move a pane to its own tab.
-- Confirm before closing a pane that is running a command (`confirm_close_running` is parsed
-  already but not wired up).
 
 ## Sidebar
 
