@@ -22,6 +22,7 @@ from .keybindings import accelerator_tokens  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
 from .search_bar import SearchBar  # noqa: E402
+from .session import SessionState, first_cwd  # noqa: E402
 from .settings_window import SettingsWindow  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
 from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
@@ -154,7 +155,8 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(toolbar)
 
         self._setup_actions()
-        self.new_tab()
+        if not (config.general.restore_session and self._restore_session(saved.session)):
+            self.new_tab()
 
         if warnings:
             # Shown once; the full list is in the log (FR-45).
@@ -212,6 +214,39 @@ class MainWindow(Adw.ApplicationWindow):
         self._containers[page] = container
         self._tab_view.set_selected_page(page)
         return container
+
+    def _restore_session(self, session: SessionState | None) -> bool:
+        """Reopen the saved tabs. Shells start fresh in their old directories; nothing that
+        was running is restarted. Returns False if there was nothing to restore."""
+        if session is None or not session.tabs:
+            return False
+        for tab in session.tabs:
+            container = self.new_tab(cwd=first_cwd(tab.layout) or str(Path.home()))
+            container.restore_layout(tab)
+        self._select_tab(session.selected)
+        # Building the other tabs queued focus grabs for their (hidden) panes. Idle callbacks
+        # run in the order they were added, so this one runs last and the selected tab wins.
+        GLib.idle_add(self._refocus_once)
+        return True
+
+    def _refocus_once(self) -> bool:
+        self._focus_current()
+        return GLib.SOURCE_REMOVE
+
+    def _capture_session(self) -> SessionState | None:
+        tabs = []
+        selected = 0
+        current = self._tab_view.get_selected_page()
+        for index in range(self._tab_view.get_n_pages()):
+            page = self._tab_view.get_nth_page(index)
+            container = self._containers.get(page)
+            tab = container.capture() if container is not None else None
+            if tab is None:
+                continue
+            if page == current:
+                selected = len(tabs)
+            tabs.append(tab)
+        return SessionState(tuple(tabs), selected) if tabs else None
 
     def _current_container(self) -> PaneContainer | None:
         page = self._tab_view.get_selected_page()
@@ -454,6 +489,9 @@ class MainWindow(Adw.ApplicationWindow):
         state.sidebar_visible = self._sidebar_visible
         state.sidebar_width = self._sidebar_width
         state.window_maximized = self.is_maximized()
+        # No tabs (the last shell exited) clears it, so the next start is a fresh one.
+        restore = self._config.general.restore_session
+        state.session = self._capture_session() if restore else None
         if not self.is_maximized() and not self.is_fullscreen():
             width, height = self.get_width(), self.get_height()
             if width > 0 and height > 0:

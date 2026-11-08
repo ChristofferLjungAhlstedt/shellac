@@ -53,6 +53,13 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   `)` loses it.
 - **Font zoom** is per pane by default; `zoom_scope = "window"` zooms every pane and new ones.
 
+- **Session restore** stores the layout as plain data (`session.py`) in `state.json`, not the
+  config. It is on by default (`general.restore_session`). Only directories are restored, never
+  running programs or scrollback. Editor panes opened from the sidebar are skipped and their
+  split collapses. The session is captured on close and on every state save (sidebar resize,
+  toggle), so a crash loses little; the cwd of a pane is whatever it was at the last save. When
+  the last tab closes because its shell exited, the session is cleared, so exiting every shell
+  means a fresh start. Reading is defensive and capped (64 tabs, 64 panes per tab).
 
 ## Milestones
 

@@ -26,6 +26,7 @@ class GeneralConfig:
     login_shell: bool = True  # pass -l to the shell (FR-1 asks for a login shell)
     scrollback_lines: int = 10000
     confirm_close_running: bool = True
+    restore_session: bool = True  # reopen the tabs, splits and directories of the last session
     clickable_urls: bool = True  # a click on a URL in the output opens it (FR-6)
     link_activation: str = "click"  # click | ctrl_click: what opens a link
     context_menu: bool = True  # right-click menu (Shift+right-click in mouse-aware programs)

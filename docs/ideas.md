@@ -14,8 +14,8 @@ being built; the rest are candidates, in no fixed order.
 
 ## High value
 
-- **Session restore.** Reopen with the same tabs, split layout and working directories. The
-  pane tree is plain data, so this is mostly serializing it into the state file.
+- **Session restore** (done). Reopen with the same tabs, split layout and working directories,
+  kept in the state file.
 - **Saved layouts / workspaces.** A small TOML file per project describing the splits and the
   command each pane starts with, opened from the sidebar's context menu on a folder.
 - **Finished-command notifications.** A desktop notification or a tab marker when a long

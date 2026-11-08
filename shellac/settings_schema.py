@@ -243,6 +243,12 @@ TERMINAL = Page(
                     "Search wraps around",
                     "After the last match, continue from the first.",
                 ),
+                _f(
+                    "general",
+                    "restore_session",
+                    "Restore the last session",
+                    "Reopen your tabs, splits and directories. Programs are not restarted.",
+                ),
                 _f("tabs", "autohide", "Hide the tab bar with one tab"),
                 _f(
                     "panes",
