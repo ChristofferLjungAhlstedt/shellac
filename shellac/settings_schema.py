@@ -279,6 +279,14 @@ TERMINAL = Page(
                     "Ask before closing a running program",
                     "Asks when a pane, tab or window has a command running in it.",
                 ),
+                _f(
+                    "general",
+                    "allow_trusted_workspaces",
+                    "Let me always trust a workspace",
+                    'Adds "Always Run" to the question before a workspace\'s commands run. '
+                    "A workspace is asked about again if its commands change. "
+                    "Off asks every time.",
+                ),
                 _f("tabs", "autohide", "Hide the tab bar with one tab"),
                 _f(
                     "panes",

@@ -23,6 +23,7 @@ a warning and its default.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tomllib
@@ -63,8 +64,10 @@ def commands_in(workspace: Workspace) -> list[str]:
     return [pane.command for tab in workspace.tabs for pane in panes_of(tab.layout) if pane.command]
 
 
-def confirm_text(commands: list[str]) -> tuple[str, str]:
-    """Heading and body for the question asked before a workspace runs commands."""
+def confirm_text(commands: list[str], *, changed: bool = False) -> tuple[str, str]:
+    """Heading and body for the question asked before a workspace runs commands.
+
+    ``changed``: the workspace was trusted before, but its commands are not the same now."""
     shown = [f"• {command}" for command in commands[:MAX_COMMANDS_SHOWN]]
     if len(commands) > MAX_COMMANDS_SHOWN:
         shown.append(f"• and {len(commands) - MAX_COMMANDS_SHOWN} more")
@@ -73,7 +76,44 @@ def confirm_text(commands: list[str]) -> tuple[str, str]:
         + "\n".join(shown)
         + "\n\nOnly continue if you trust this folder."
     )
+    if changed:
+        body = "The commands in this workspace have changed since you last trusted it.\n\n" + body
     return "Run these commands?", body
+
+
+# -- trust ----------------------------------------------------------------------------------
+#
+# "Always run" remembers a workspace by the folder and by a fingerprint of its commands, so a
+# file that later gains or changes a command (a pull that rewrote it, say) is asked about again.
+
+MAX_TRUSTED = 200
+
+
+def trust_key(folder: str) -> str:
+    return os.path.realpath(folder)
+
+
+def fingerprint(commands: list[str]) -> str:
+    return hashlib.sha256("\0".join(commands).encode("utf-8")).hexdigest()
+
+
+def trust_status(trusted: dict[str, str], folder: str, commands: list[str]) -> str:
+    """ "trusted": run without asking; "changed": trusted once, commands differ now;
+    "unknown": never trusted."""
+    known = trusted.get(trust_key(folder))
+    if known is None:
+        return "unknown"
+    return "trusted" if known == fingerprint(commands) else "changed"
+
+
+def with_trust(trusted: dict[str, str], folder: str, commands: list[str]) -> dict[str, str]:
+    """A copy of ``trusted`` that also trusts these commands; the oldest entries make room."""
+    key = trust_key(folder)
+    result = {k: v for k, v in trusted.items() if k != key}
+    result[key] = fingerprint(commands)
+    while len(result) > MAX_TRUSTED:
+        del result[next(iter(result))]
+    return result
 
 
 # -- reading --------------------------------------------------------------------------------

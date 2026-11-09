@@ -17,6 +17,7 @@ login_shell = true       # start the shell with -l
 scrollback_lines = 10000
 restore_session = true   # reopen the tabs, splits and directories of the last session
 confirm_close_running = true  # ask before closing a pane, tab or window with a command running
+allow_trusted_workspaces = true  # offer "Always Run" when a workspace would run commands
 finished_tab_marker = true    # mark a background tab when a long command ends in it
 finished_notification = true  # desktop notification for that while Shellac is not the active window
 finished_after_seconds = 10   # only commands that ran at least this long are reported
@@ -260,6 +261,15 @@ run = "git status"
 run commands Shellac lists them first and asks. Nothing runs until you press **Run**. The
 commands are typed into the shell as if you had typed them (they appear in your shell history),
 once the shell has printed its prompt.
+
+**Always Run.** The question has a third button, **Always Run**, for a workspace you use often.
+Shellac remembers the folder together with a fingerprint of the commands, in the state file
+(not the config). That workspace then opens without asking, until a command in the file is
+added, removed or changed (a `git pull` that rewrote it, say): then you are asked again, and
+the question says the commands have changed. Turn off `allow_trusted_workspaces` (Settings,
+Behavior: "Let me always trust a workspace") to remove the button and to ask every time, even
+for workspaces you trusted before; they are trusted again if you turn it back on. Opening
+a workspace with no commands never asks.
 
 ## Live reload
 

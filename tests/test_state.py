@@ -81,3 +81,22 @@ def test_theme_choice_round_trips_and_bad_values_are_ignored(tmp_path: Path):
 
     assert save_state(UiState(), path)
     assert "appearance" not in json.loads(path.read_text())
+
+
+def test_trusted_workspaces_round_trip(tmp_path: Path):
+    path = tmp_path / "state.json"
+    trusted = {"/home/me/a": "a" * 64, "/home/me/b": "b" * 64}
+    assert save_state(UiState(trusted_workspaces=trusted), path)
+    assert load_state(path).trusted_workspaces == trusted
+
+
+def test_damaged_trusted_workspaces_are_dropped(tmp_path: Path):
+    path = tmp_path / "state.json"
+    path.write_text(
+        json.dumps(
+            {"trusted_workspaces": {"/ok": "c" * 64, "/short": "abc", "": "d" * 64, "/n": 5}}
+        )
+    )
+    assert load_state(path).trusted_workspaces == {"/ok": "c" * 64}
+    path.write_text(json.dumps({"trusted_workspaces": ["nope"]}))
+    assert load_state(path).trusted_workspaces == {}

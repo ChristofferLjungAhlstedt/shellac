@@ -51,6 +51,7 @@ def test_only_unknown_programs_have_no_list():
 def test_the_setting_defaults_on():
     assert Config().general.confirm_close_running is True
     assert GeneralConfig().confirm_close_running is True
+    assert GeneralConfig().allow_trusted_workspaces is True
 
 
 def test_command_running_with_no_shell_or_closed_descriptor_is_false():

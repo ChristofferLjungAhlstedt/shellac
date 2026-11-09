@@ -19,6 +19,7 @@ from gi.repository import GLib, Gtk, Vte  # noqa: E402
 from shellac.application import Application  # noqa: E402
 from shellac.pane_tree import Axis  # noqa: E402
 from shellac.session import SplitState  # noqa: E402
+from shellac.state import load_state  # noqa: E402
 from shellac.workspace import WORKSPACE_FILE, parse_workspace  # noqa: E402
 
 SHOT = os.environ["SHOTDIR"]
@@ -291,11 +292,75 @@ def c3():
     check("a missing file opens nothing", len(containers()) == state["tabs"] + 1 and dialog() is None)
 
 
+def write_workspace(command):
+    with open(f"{OTHER}/{WORKSPACE_FILE}", "w") as handle:
+        handle.write(f'[[tab]]\n[[tab.pane]]\nrun = "{command}"\n')
+
+
+def labels():
+    return [b.get_label() for b in buttons(dialog())] if dialog() else []
+
+
+def d1():
+    # "Always Run": offered on the question, and remembered.
+    write_workspace("echo TRUST$((6*7))")
+    state["tabs"] = len(containers())
+    win().open_workspace(OTHER)
+
+
+def d2():
+    check("the question offers Always Run", "Always Run" in labels(), str(labels()))
+    shot("workspace_always_run")
+    press("Always Run")
+
+
+def d3():
+    check("Always Run opens the workspace", len(containers()) == state["tabs"] + 1)
+    trusted = load_state().trusted_workspaces
+    check("and remembers the folder", real(OTHER) in trusted, str(list(trusted)))
+    state["tabs"] = len(containers())
+    win().open_workspace(OTHER)
+
+
+def d4():
+    check("a trusted workspace opens without asking", dialog() is None)
+    check("it opened", len(containers()) == state["tabs"] + 1, str(len(containers())))
+    # A command that changed is asked about again, and says so.
+    write_workspace("echo CHANGED")
+    state["tabs"] = len(containers())
+    win().open_workspace(OTHER)
+
+
+def d5():
+    d = dialog()
+    check("a changed command asks again", d is not None)
+    if d is not None:
+        check("and says it changed", "changed" in d.get_body(), d.get_body()[:80])
+        shot("workspace_changed")
+        press("Cancel")
+
+
+def d6():
+    check("Cancel opens nothing", len(containers()) == state["tabs"])
+    # The setting off: the stored trust is ignored and Always Run is not offered.
+    write_workspace("echo TRUST$((6*7))")
+    win()._config.general.allow_trusted_workspaces = False
+    win().open_workspace(OTHER)
+
+
+def d7():
+    check("setting off: asks even for a trusted workspace", dialog() is not None)
+    check("and offers no Always Run", "Always Run" not in labels(), str(labels()))
+    press("Cancel")
+    win()._config.general.allow_trusted_workspaces = True
+
+
 state: dict = {}
 STEPS = [
     (a1, 800), (a2, 500), (a3, 600), (a4, 500), (a5, 3500), (a6, 500),
     (b1, 800), (b2, 800), (b3, 800), (b4, 800), (b5, 800), (b6, 1000),
     (c1, 800), (c2, 800), (c3, 300),
+    (d1, 700), (d2, 400), (d3, 2500), (d4, 800), (d5, 500), (d6, 600), (d7, 500),
 ]
 idx = [0]
 

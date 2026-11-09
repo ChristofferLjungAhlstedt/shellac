@@ -46,6 +46,8 @@ from .workspace import (  # noqa: E402
     confirm_text,
     make_draft,
     parse_workspace,
+    trust_status,
+    with_trust,
     workspace_file,
     workspace_to_toml,
 )
@@ -350,11 +352,30 @@ class MainWindow(Adw.ApplicationWindow):
                 self.show_toast(f"{WORKSPACE_FILE}: {result.warnings[0]}{suffix}")
 
         commands = commands_in(workspace)
-        if commands:
-            heading, body = confirm_text(commands)
-            self._ask(heading, body, "Run", start)
-        else:
+        if not commands:
             start()
+            return
+        allowed = self._config.general.allow_trusted_workspaces
+        status = trust_status(load_state().trusted_workspaces, folder, commands) if allowed else ""
+        if status == "trusted":
+            start()
+            return
+        heading, body = confirm_text(commands, changed=status == "changed")
+
+        def always() -> None:
+            state = load_state()
+            state.trusted_workspaces = with_trust(state.trusted_workspaces, folder, commands)
+            save_state(state)
+            start()
+
+        self._ask(
+            heading,
+            body,
+            "Run",
+            start,
+            always_label="Always Run" if allowed else None,
+            on_always=always,
+        )
 
     def _start_workspace(self, workspace: Workspace) -> None:
         first_index = self._tab_view.get_n_pages()
@@ -408,9 +429,13 @@ class MainWindow(Adw.ApplicationWindow):
         on_yes: Callable[[], None],
         *,
         destructive: bool = False,
+        always_label: str | None = None,
+        on_always: Callable[[], None] | None = None,
     ) -> None:
         dialog = Adw.AlertDialog(heading=heading, body=body)
         dialog.add_response("cancel", "Cancel")
+        if always_label and on_always:
+            dialog.add_response("always", always_label)
         dialog.add_response("yes", yes_label)
         appearance = (
             Adw.ResponseAppearance.DESTRUCTIVE if destructive else Adw.ResponseAppearance.SUGGESTED
@@ -422,6 +447,8 @@ class MainWindow(Adw.ApplicationWindow):
         def answered(_dialog: Adw.AlertDialog, response: str) -> None:
             if response == "yes":
                 on_yes()
+            elif response == "always" and on_always:
+                on_always()
 
         dialog.connect("response", answered)
         dialog.present(self)

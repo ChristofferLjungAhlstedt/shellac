@@ -14,11 +14,12 @@ from __future__ import annotations
 import json
 import logging
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import APP_NAME
 from .session import SessionState, session_from_data, session_to_data
+from .workspace import MAX_TRUSTED
 
 log = logging.getLogger(__name__)
 
@@ -40,6 +41,8 @@ class UiState:
     theme: str | None = None  # a theme picked at runtime (Ctrl+Shift+P), None: use the config
     theme_basis: str | None = None  # the config's theme settings when it was picked
     session: SessionState | None = None  # tabs and layouts to reopen (see session.py)
+    # workspace folder -> fingerprint of the commands you chose to always run (workspace.py)
+    trusted_workspaces: dict[str, str] = field(default_factory=dict)
 
 
 def state_path() -> Path:
@@ -73,7 +76,19 @@ def load_state(path: Path | None = None) -> UiState:
         theme=_text(appearance.get("theme")),
         theme_basis=_text(appearance.get("theme_basis")),
         session=session_from_data(data.get("session")),
+        trusted_workspaces=_trusted(data.get("trusted_workspaces")),
     )
+
+
+def _trusted(value: object) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {}
+    entries = {
+        key: known
+        for key, known in value.items()
+        if isinstance(key, str) and key and isinstance(known, str) and len(known) == 64
+    }
+    return dict(list(entries.items())[-MAX_TRUSTED:])
 
 
 def _text(value: object) -> str | None:
@@ -109,6 +124,8 @@ def save_state(state: UiState, path: Path | None = None) -> bool:
         document["appearance"] = {"theme": state.theme, "theme_basis": state.theme_basis or ""}
     if state.session is not None:
         document["session"] = session_to_data(state.session)
+    if state.trusted_workspaces:
+        document["trusted_workspaces"] = state.trusted_workspaces
     temporary = path.with_suffix(".json.tmp")
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

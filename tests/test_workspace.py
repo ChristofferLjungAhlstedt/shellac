@@ -5,15 +5,19 @@ from shellac.session import PaneState, SplitState, TabState, panes_of
 from shellac.workspace import (
     HEADER,
     MAX_COMMANDS_SHOWN,
+    MAX_TRUSTED,
     WORKSPACE_FILE,
     PaneValues,
     build_tab,
     commands_in,
     confirm_text,
+    fingerprint,
     folder_text,
     make_draft,
     pane_positions,
     parse_workspace,
+    trust_status,
+    with_trust,
     workspace_file,
     workspace_to_toml,
 )
@@ -374,3 +378,68 @@ def test_pane_positions_name_where_each_pane_is(tmp_path: Path):
         SplitState(Axis.HORIZONTAL, 0.5, PaneState("c"), PaneState("d")),
     )
     assert pane_positions(grid) == ["Top left", "Top right", "Bottom left", "Bottom right"]
+
+
+# -- trust ("Always Run") -------------------------------------------------------------------
+
+
+def test_unknown_until_trusted(tmp_path: Path):
+    folder = project(tmp_path)
+    assert trust_status({}, folder, ["make"]) == "unknown"
+    trusted = with_trust({}, folder, ["make"])
+    assert trust_status(trusted, folder, ["make"]) == "trusted"
+
+
+def test_changed_commands_are_asked_about_again(tmp_path: Path):
+    folder = project(tmp_path)
+    trusted = with_trust({}, folder, ["make"])
+    assert trust_status(trusted, folder, ["make", "rm -rf x"]) == "changed"
+    assert trust_status(trusted, folder, ["make test"]) == "changed"
+    assert trust_status(trusted, folder, []) == "changed"
+
+
+def test_trust_is_per_folder(tmp_path: Path):
+    one, two = tmp_path / "one", tmp_path / "two"
+    one.mkdir()
+    two.mkdir()
+    trusted = with_trust({}, str(one), ["make"])
+    assert trust_status(trusted, str(two), ["make"]) == "unknown"
+
+
+def test_trust_follows_symlinks(tmp_path: Path):
+    real = tmp_path / "real"
+    real.mkdir()
+    link = tmp_path / "link"
+    link.symlink_to(real)
+    trusted = with_trust({}, str(real), ["make"])
+    assert trust_status(trusted, str(link), ["make"]) == "trusted"
+
+
+def test_commands_are_not_run_together_by_the_fingerprint():
+    assert fingerprint(["ab", "c"]) != fingerprint(["a", "bc"])
+
+
+def test_retrusting_replaces_and_does_not_mutate(tmp_path: Path):
+    folder = project(tmp_path)
+    first = with_trust({}, folder, ["a"])
+    second = with_trust(first, folder, ["b"])
+    assert trust_status(first, folder, ["a"]) == "trusted"
+    assert trust_status(second, folder, ["b"]) == "trusted"
+    assert len(second) == 1
+
+
+def test_trust_list_is_capped_dropping_the_oldest():
+    trusted: dict[str, str] = {}
+    for number in range(MAX_TRUSTED + 5):
+        trusted = with_trust(trusted, f"/nowhere/{number}", ["x"])
+    assert len(trusted) == MAX_TRUSTED
+    assert trust_status(trusted, "/nowhere/0", ["x"]) == "unknown"
+    assert trust_status(trusted, f"/nowhere/{MAX_TRUSTED + 4}", ["x"]) == "trusted"
+
+
+def test_confirm_text_says_when_commands_changed():
+    _heading, plain = confirm_text(["make"])
+    _heading, changed = confirm_text(["make"], changed=True)
+    assert "changed" not in plain
+    assert changed.startswith("The commands in this workspace have changed")
+    assert "make" in changed

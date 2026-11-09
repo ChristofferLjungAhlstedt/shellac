@@ -26,6 +26,7 @@ class GeneralConfig:
     login_shell: bool = True  # pass -l to the shell (FR-1 asks for a login shell)
     scrollback_lines: int = 10000
     confirm_close_running: bool = True
+    allow_trusted_workspaces: bool = True  # offer "Always Run" for a workspace and honor it
     restore_session: bool = True  # reopen the tabs, splits and directories of the last session
     finished_tab_marker: bool = True  # mark a background tab when a long command ends in it
     finished_notification: bool = True  # desktop notification for that, while the window is away
