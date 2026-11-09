@@ -16,8 +16,9 @@ being built; the rest are candidates, in no fixed order.
 
 - **Session restore** (done). Reopen with the same tabs, split layout and working directories,
   kept in the state file.
-- **Saved layouts / workspaces.** A small TOML file per project describing the splits and the
-  command each pane starts with, opened from the sidebar's context menu on a folder.
+- **Saved layouts / workspaces** (done). A `.shellac.toml` per project describing the splits and
+  the command each pane starts with, opened from the sidebar's context menu on a folder. Not
+  done: remembering that you trust a file so it stops asking, and a way to list workspaces.
 - **Finished-command notifications** (done). A tab marker or a desktop notification when a long
   command ends in a background pane or tab, found by watching the pane's foreground process.
 

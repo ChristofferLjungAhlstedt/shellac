@@ -30,6 +30,7 @@ from .file_tree_model import (  # noqa: E402
     nearest_existing_dir,
 )
 from .git_status import MARKERS, GitInfo, load_git_info  # noqa: E402
+from .workspace import workspace_file  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -168,6 +169,8 @@ class FileTree(Gtk.Box):
         *,
         on_activate: Callable[[Node], None],
         on_open_tab: Callable[[str], None],
+        on_open_workspace: Callable[[str], None],
+        on_save_workspace: Callable[[str], None],
         on_message: Callable[[str], None],
         on_leave: Callable[[], None],
         on_pin_changed: Callable[[bool], None],
@@ -177,6 +180,8 @@ class FileTree(Gtk.Box):
         self._config = config
         self._on_activate = on_activate
         self._on_open_tab = on_open_tab
+        self._on_open_workspace = on_open_workspace
+        self._on_save_workspace = on_save_workspace
         self._on_message = on_message
         self._on_leave = on_leave
         self._on_pin_changed = on_pin_changed
@@ -272,10 +277,15 @@ class FileTree(Gtk.Box):
         self._menu_popover.set_has_arrow(False)
         self._menu_popover.set_parent(self)
 
-    def _build_menu(self) -> Gio.Menu:
+    def _build_menu(self, node: Node | None = None) -> Gio.Menu:
+        """The context menu. Rebuilt for each node: "Open Workspace" only appears where the
+        folder has a workspace file."""
         menu = Gio.Menu()
         first = Gio.Menu()
         first.append("Open in New Tab", "tree.open_tab")
+        if node is not None and workspace_file(self._directory_of(node)):
+            first.append("Open Workspace", "tree.open_workspace")
+        first.append("Save Tab as Workspace…", "tree.save_workspace")
         first.append("Reveal in File Manager", "tree.reveal")
         second = Gio.Menu()
         second.append("Copy Path", "tree.copy_path")
@@ -294,6 +304,8 @@ class FileTree(Gtk.Box):
         table: dict[str, Callable[[], None]] = {
             "open_tab": self._menu_open_tab,
             "reveal": self._menu_reveal,
+            "open_workspace": lambda: self._on_open_workspace(self._directory_of(self._target())),
+            "save_workspace": lambda: self._on_save_workspace(self._directory_of(self._target())),
             "copy_path": lambda: self._copy(self._target().path),
             "copy_relative": self._menu_copy_relative,
             "new_file": lambda: self._prompt_new(directory=False),
@@ -360,6 +372,7 @@ class FileTree(Gtk.Box):
 
     def _popup_menu(self, node: Node, rect: Gdk.Rectangle | None = None) -> None:
         self._menu_node = node
+        self._menu_popover.set_menu_model(self._build_menu(node))
         if rect is None:
             rect = Gdk.Rectangle()
             rect.x, rect.y, rect.width, rect.height = 8, 40, 1, 1

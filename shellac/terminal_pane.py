@@ -110,6 +110,11 @@ class TerminalPane:
         self._link_activation = config.general.link_activation
         self._context_menu = config.general.context_menu
         self._press: tuple[float, float] | None = None  # surface position of the button press
+        self._startup_text: str | None = None  # see type_when_ready
+        self._startup_handler = 0
+        self._startup_quiet = 0
+        self._startup_cap = 0
+        self._startup_quiet_ms = 300
         self._menu_uri: str | None = None
         self._popover: Gtk.Popover | None = None
         self._setup_links()
@@ -452,6 +457,53 @@ class TerminalPane:
         pty = self.terminal.get_pty()
         return foreground_name(pty.get_fd()) if pty is not None else None
 
+    def type_when_ready(self, text: str, quiet_ms: int = 300, max_ms: int = 4000) -> None:
+        """Type ``text`` and Enter into a shell that has only just started.
+
+        A line typed at once can be lost, so this waits until the shell has printed its
+        prompt and gone quiet for ``quiet_ms``; a shell that never prints anything gets the
+        line after ``max_ms``. Used by workspaces to start each pane's command.
+        """
+        self._startup_stop()
+        self._startup_text = text
+        self._startup_quiet_ms = quiet_ms
+        self._startup_handler = self.terminal.connect("contents-changed", self._startup_output)
+        self._startup_cap = GLib.timeout_add(max_ms, self._startup_cap_fired)
+
+    def _startup_output(self, *_args: object) -> None:
+        if self._startup_quiet:
+            GLib.source_remove(self._startup_quiet)
+        self._startup_quiet = GLib.timeout_add(self._startup_quiet_ms, self._startup_quiet_fired)
+
+    def _startup_quiet_fired(self) -> bool:
+        self._startup_quiet = 0  # this source is ending by itself
+        self._startup_finish()
+        return GLib.SOURCE_REMOVE
+
+    def _startup_cap_fired(self) -> bool:
+        self._startup_cap = 0
+        self._startup_finish()
+        return GLib.SOURCE_REMOVE
+
+    def _startup_finish(self) -> None:
+        text = self._startup_text
+        self._startup_stop()
+        if text is not None and not self._closed and self.child_pid is not None:
+            self.send_text(text + "\n")
+
+    def _startup_stop(self) -> None:
+        """Forget a pending startup line (it was sent, or the pane is closing)."""
+        self._startup_text = None
+        if self._startup_handler:
+            self.terminal.disconnect(self._startup_handler)
+            self._startup_handler = 0
+        if self._startup_quiet:
+            GLib.source_remove(self._startup_quiet)
+            self._startup_quiet = 0
+        if self._startup_cap:
+            GLib.source_remove(self._startup_cap)
+            self._startup_cap = 0
+
     def send_text(self, text: str) -> None:
         """Type ``text`` into the terminal as if the user had. Callers check ``is_idle``."""
         self.terminal.feed_child(text.encode())
@@ -480,6 +532,7 @@ class TerminalPane:
         if self._closed:
             return
         self._closed = True
+        self._startup_stop()
         for handler in self._handlers:
             self.terminal.disconnect(handler)
         self._handlers.clear()

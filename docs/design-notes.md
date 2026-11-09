@@ -74,6 +74,19 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   are watching. The tab marker is libadwaita's own "needs attention" indicator and is cleared
   when the tab is selected. If prompt marks (OSC 133) ever land in VTE, the exit status and exact
   start and end could replace the polling.
+- **Workspaces** (`workspace.py`, `.shellac.toml`). A workspace is parsed into the same
+  `TabState`/`SplitState` types session restore uses, so one `replay` rebuilds both; the only
+  addition is `PaneState.command`. The file format is nested `[[tab.pane]]` tables, which read
+  like the layout and cover any split tree; more than two siblings are folded into equal binary
+  splits. It is opened only from the sidebar menu, not the palette, because every palette
+  command must have a default shortcut (and a workspace is tied to a folder anyway). Because
+  the file can arrive with a cloned repository, opening one that would run commands always
+  shows them and asks; there is deliberately no "always trust" yet. Commands are typed into the
+  new shell with `TerminalPane.type_when_ready`: a line sent at once to a starting shell can be
+  lost, so it waits for the prompt to be drawn and the output to go quiet (300 ms), or sends
+  after 4 s to a shell that prints nothing. Saving writes only what Shellac knows: layout,
+  ratios and directories (relative to the folder when inside it); it asks before replacing a
+  file, since the old commands would be lost.
 
 ## Milestones
 
