@@ -67,6 +67,7 @@ class MainWindow(Adw.ApplicationWindow):
         config: Config,
         theme: Theme,
         warnings: list[str] | None = None,
+        restore: bool = True,
     ) -> None:
         saved = load_state()  # remembered size wins over the config's first-launch default
         super().__init__(
@@ -189,7 +190,9 @@ class MainWindow(Adw.ApplicationWindow):
         self.set_content(toolbar)
 
         self._setup_actions()
-        if not (config.general.restore_session and self._restore_session(saved.session)):
+        if not (
+            restore and config.general.restore_session and self._restore_session(saved.session)
+        ):
             self.new_tab()
 
         if warnings:
@@ -321,11 +324,12 @@ class MainWindow(Adw.ApplicationWindow):
 
     # -- workspaces (.shellac.toml) -----------------------------------------------------------
 
-    def open_workspace(self, folder: str) -> None:
+    def open_workspace(self, folder: str, *, replace_blank: bool = False) -> None:
         """Open the tabs and splits of ``folder``'s workspace file, typing each pane's command.
 
         The file can come from a repository you cloned, so when it would run commands they are
-        listed and you are asked first.
+        listed and you are asked first. ``replace_blank``: a window that was just opened for this
+        has one empty tab, which goes away once the workspace's tabs are in.
         """
         path = workspace_file(folder)
         if path is None:
@@ -345,7 +349,7 @@ class MainWindow(Adw.ApplicationWindow):
         workspace = result.workspace
 
         def start() -> None:
-            self._start_workspace(workspace)
+            self._start_workspace(workspace, replace_blank=replace_blank)
             if result.warnings:
                 more = len(result.warnings) - 1
                 suffix = f" (and {more} more)" if more else ""
@@ -377,7 +381,13 @@ class MainWindow(Adw.ApplicationWindow):
             on_always=always,
         )
 
-    def _start_workspace(self, workspace: Workspace) -> None:
+    def _start_workspace(self, workspace: Workspace, *, replace_blank: bool = False) -> None:
+        blank = None
+        if replace_blank and self._tab_view.get_n_pages() == 1:
+            only = self._tab_view.get_nth_page(0)
+            panes = self._containers[only].panes()
+            if len(panes) == 1 and not panes[0].is_running_command():
+                blank = only
         first_index = self._tab_view.get_n_pages()
         for tab in workspace.tabs:
             container = self.new_tab(cwd=first_cwd(tab.layout))
@@ -385,6 +395,9 @@ class MainWindow(Adw.ApplicationWindow):
             for pane, state in zip(container.panes(), panes_of(tab.layout), strict=False):
                 if state.command:
                     pane.type_when_ready(state.command)
+        if blank is not None:
+            self._tab_view.close_page(blank)
+            first_index -= 1
         self._select_tab(first_index)
         GLib.idle_add(self._refocus_once)  # the other new tabs queued focus grabs; see restore
 

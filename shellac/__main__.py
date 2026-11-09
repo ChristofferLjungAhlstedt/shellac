@@ -31,6 +31,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="remove what --install-desktop added and exit",
     )
+    parser.add_argument(
+        "--workspace",
+        metavar="FOLDER",
+        help="open the workspace (.shellac.toml) of FOLDER instead of restoring the last session",
+    )
     parser.add_argument("--debug", action="store_true", help="enable debug logging")
     return parser
 
@@ -75,6 +80,15 @@ def main(argv: list[str] | None = None) -> int:
             sys.stdout.write("Nothing to remove.\n")
         return 0
 
+    workspace = None
+    if args.workspace is not None:
+        from .workspace import resolve_workspace_argument
+
+        workspace, problem = resolve_workspace_argument(args.workspace)
+        if workspace is None:
+            sys.stderr.write(f"{APP_NAME}: --workspace {problem}\n")
+            return 2
+
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
         format="%(name)s: %(levelname)s: %(message)s",
@@ -86,8 +100,9 @@ def main(argv: list[str] | None = None) -> int:
     _quiet_known_warnings()
 
     app = Application(config_file=args.config)
-    # Hand GTK only the program name: our own flags are already parsed above.
-    return app.run(sys.argv[:1])
+    # Hand GTK only the program name (and the workspace, which a running Shellac receives):
+    # our own flags are already parsed above.
+    return app.run([sys.argv[0], *(["--workspace", workspace] if workspace else [])])
 
 
 if __name__ == "__main__":

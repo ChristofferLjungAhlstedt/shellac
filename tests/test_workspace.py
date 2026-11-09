@@ -16,6 +16,7 @@ from shellac.workspace import (
     make_draft,
     pane_positions,
     parse_workspace,
+    resolve_workspace_argument,
     trust_status,
     with_trust,
     workspace_file,
@@ -443,3 +444,26 @@ def test_confirm_text_says_when_commands_changed():
     assert "changed" not in plain
     assert changed.startswith("The commands in this workspace have changed")
     assert "make" in changed
+
+
+# -- shellac --workspace ----------------------------------------------------------------------
+
+
+def test_workspace_argument_accepts_a_folder_or_its_file(tmp_path: Path):
+    (tmp_path / WORKSPACE_FILE).write_text("[[tab]]\n")
+    assert resolve_workspace_argument(str(tmp_path)) == (str(tmp_path), None)
+    assert resolve_workspace_argument(str(tmp_path / WORKSPACE_FILE)) == (str(tmp_path), None)
+
+
+def test_workspace_argument_is_relative_to_the_given_directory(tmp_path: Path):
+    (tmp_path / "proj").mkdir()
+    (tmp_path / "proj" / WORKSPACE_FILE).write_text("[[tab]]\n")
+    folder, error = resolve_workspace_argument("proj/../proj", cwd=str(tmp_path))
+    assert (folder, error) == (str(tmp_path / "proj"), None)
+
+
+def test_workspace_argument_explains_what_is_wrong(tmp_path: Path):
+    folder, error = resolve_workspace_argument(str(tmp_path / "missing"))
+    assert folder is None and "not a folder" in (error or "")
+    folder, error = resolve_workspace_argument(str(tmp_path))
+    assert folder is None and WORKSPACE_FILE in (error or "")

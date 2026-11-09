@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
 import time
 from pathlib import Path
 
@@ -87,8 +88,18 @@ _IGNORED_MONITOR_EVENTS = {
 
 class Application(Adw.Application):
     def __init__(self, config_file: Path | None = None) -> None:
-        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE)
         self._config_file = config_file
+        # `shellac --workspace FOLDER`: also reaches an already running Shellac.
+        self.add_main_option(
+            "workspace",
+            0,
+            GLib.OptionFlags.NONE,
+            GLib.OptionArg.FILENAME,
+            "Open the workspace of FOLDER",
+            "FOLDER",
+        )
+        self._launch_workspace: str | None = None
 
         # Real values are set in do_startup, once Adwaita is initialised and the system
         # color scheme can be queried.
@@ -124,11 +135,25 @@ class Application(Adw.Application):
         Adw.StyleManager.get_default().connect("notify::dark", self._on_system_scheme_changed)
         self._watch_files()
 
+    def do_command_line(self, command_line: Gio.ApplicationCommandLine) -> int:
+        value = command_line.get_options_dict().lookup_value("workspace", None)
+        if value is not None:
+            self._launch_workspace = os.fsdecode(value.get_bytestring())
+        self.activate()
+        return 0
+
     def do_activate(self) -> None:
+        folder, self._launch_workspace = self._launch_workspace, None
         window = self.props.active_window
+        fresh = window is None
         if window is None:
-            window = MainWindow(self, self.config, self.theme, self.warnings)
+            # A workspace given on the command line is what you want, not the last session.
+            window = MainWindow(
+                self, self.config, self.theme, self.warnings, restore=folder is None
+            )
         window.present()
+        if folder:
+            window.open_workspace(folder, replace_blank=fresh)
 
     def do_shutdown(self) -> None:
         if self._reload_source:

@@ -47,7 +47,9 @@ and live-reloaded TOML configuration, in a native desktop application.
 - **Persistent window state.** Window size, sidebar visibility and sidebar width are restored on start.
 - **Session restore.** Reopens your tabs, splits and directories (not running programs).
 - **Workspaces.** A `.shellac.toml` in a project folder opens your tabs, splits and start-up
-  commands from the sidebar's folder menu; "Start a Workspace in This Folder…" sets one up from your current tab in a small dialog.
+  commands from the sidebar's folder menu; "Start a Workspace in This Folder…" sets one up from
+  your current tab in a small dialog, and `shellac --workspace ~/proj` opens one from the
+  command line.
 - **Safe closing.** Asks before closing a pane, tab or window while a command is running.
 - **Finished commands.** A marker on a background tab, and a desktop notification while the
   window is away, when a long command ends.

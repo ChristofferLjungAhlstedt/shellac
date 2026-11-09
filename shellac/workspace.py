@@ -59,6 +59,21 @@ def workspace_file(folder: str) -> str | None:
     return path if os.path.isfile(path) else None
 
 
+def resolve_workspace_argument(text: str, cwd: str | None = None) -> tuple[str | None, str | None]:
+    """The folder for ``shellac --workspace TEXT``, as (absolute folder, None) or (None, error).
+
+    ``TEXT`` is a project folder or its workspace file; relative paths start from ``cwd``."""
+    path = os.path.expanduser(text)
+    path = os.path.normpath(os.path.join(cwd or os.getcwd(), path))
+    if os.path.basename(path) == WORKSPACE_FILE and os.path.isfile(path):
+        path = os.path.dirname(path)
+    if not os.path.isdir(path):
+        return None, f"{text}: not a folder"
+    if workspace_file(path) is None:
+        return None, f"no {WORKSPACE_FILE} in {path}"
+    return path, None
+
+
 def commands_in(workspace: Workspace) -> list[str]:
     """Every command the workspace would type, in order."""
     return [pane.command for tab in workspace.tabs for pane in panes_of(tab.layout) if pane.command]

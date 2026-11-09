@@ -271,6 +271,14 @@ Behavior: "Let me always trust a workspace") to remove the button and to ask eve
 for workspaces you trusted before; they are trusted again if you turn it back on. Opening
 a workspace with no commands never asks.
 
+**From the command line.** `shellac --workspace ~/projects/windlog` opens that project's
+workspace instead of restoring the last session (the argument is the folder or its
+`.shellac.toml`; relative paths work). If Shellac is already running, its window gets the
+workspace as new tabs instead of a second window opening. The same question about commands is
+asked, unless you chose Always Run. Something that cannot work (no such folder, no file in it)
+is reported on the terminal and nothing opens. Use it as a launcher per project, for example a
+`windlog.desktop` file with `Exec=shellac --workspace /home/you/projects/windlog`.
+
 ## Live reload
 
 The config file and the themes folder are watched. Saving either applies the change to

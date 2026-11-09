@@ -14,5 +14,7 @@ processes on the same state directory to see what comes back (and that a cleared
 fresh). `confirm_close.py` covers the "still running" confirmation for panes, tabs and the window,
 using a real `sleep` in a pane; `finished_command.py` covers the tab marker and the desktop
 notification for a command that ends (notifications are captured, not delivered). `workspace.py` covers opening a workspace (with its confirmation), starting and updating one through its dialog and the sidebar
-menu, with real commands running in real panes. Each runs steps on a timer, so a step that needs time to settle (a file reload takes about
+menu, with real commands running in real panes. `launch_workspace.py` covers `shellac --workspace`: a
+first launch skips the saved session, and a second process hands its folder to the running
+window. Each runs steps on a timer, so a step that needs time to settle (a file reload takes about
 250 ms) is given a longer delay. New checks are easiest to write by copying one of these.

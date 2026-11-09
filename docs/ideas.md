@@ -18,8 +18,8 @@ being built; the rest are candidates, in no fixed order.
   kept in the state file.
 - **Saved layouts / workspaces** (done). A `.shellac.toml` per project describing the splits and
   the command each pane starts with, opened from the sidebar's context menu on a folder. Not
-  done: a way to reach workspaces faster (recent workspaces, a `--workspace` command-line
-  option). Remembering that you trust a file is done (**Always Run**).
+  done: a list of recent workspaces to reach them faster. The `--workspace` command-line
+  option is done. Remembering that you trust a file is done (**Always Run**).
 - **Finished-command notifications** (done). A tab marker or a desktop notification when a long
   command ends in a background pane or tab, found by watching the pane's foreground process.
 
