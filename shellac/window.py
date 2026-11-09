@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import time
 import weakref
@@ -31,13 +32,24 @@ from .keybindings import accelerator_tokens  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
 from .search_bar import SearchBar  # noqa: E402
-from .session import SessionState, first_cwd  # noqa: E402
+from .session import SessionState, TabState, first_cwd, panes_of  # noqa: E402
 from .settings_window import SettingsWindow  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
 from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
 from .terminal_actions import cd_command, path_text  # noqa: E402
 from .terminal_pane import TerminalPane  # noqa: E402
 from .theme import Theme  # noqa: E402
+from .workspace import (  # noqa: E402
+    WORKSPACE_FILE,
+    Workspace,
+    commands_in,
+    confirm_text,
+    make_draft,
+    parse_workspace,
+    workspace_file,
+    workspace_to_toml,
+)
+from .workspace_dialog import WorkspaceDialog  # noqa: E402
 
 MAX_TAB_SHORTCUTS = 9
 FOLLOW_DEBOUNCE_MS = 150  # wait for rapid directory changes to settle (section 8.4)
@@ -131,6 +143,8 @@ class MainWindow(Adw.ApplicationWindow):
             config.sidebar,
             on_activate=self._on_sidebar_activate,
             on_open_tab=lambda path: self.new_tab(cwd=path),
+            on_open_workspace=self.open_workspace,
+            on_edit_workspace=self.edit_workspace,
             on_message=self.show_toast,
             on_leave=self._focus_current,
             on_pin_changed=self._on_pin_changed,
@@ -302,6 +316,115 @@ class MainWindow(Adw.ApplicationWindow):
             container_pane = container.focused_pane
             if container_pane is not None:
                 container_pane.grab_focus()
+
+    # -- workspaces (.shellac.toml) -----------------------------------------------------------
+
+    def open_workspace(self, folder: str) -> None:
+        """Open the tabs and splits of ``folder``'s workspace file, typing each pane's command.
+
+        The file can come from a repository you cloned, so when it would run commands they are
+        listed and you are asked first.
+        """
+        path = workspace_file(folder)
+        if path is None:
+            self.show_toast(f"No {WORKSPACE_FILE} in that folder")
+            return
+        try:
+            text = Path(path).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            self.show_toast(
+                f"Cannot read {WORKSPACE_FILE}: {getattr(exc, 'strerror', None) or exc}"
+            )
+            return
+        result = parse_workspace(text, folder)
+        if result.workspace is None:
+            self.show_toast(f"Cannot open {WORKSPACE_FILE}: {result.error}")
+            return
+        workspace = result.workspace
+
+        def start() -> None:
+            self._start_workspace(workspace)
+            if result.warnings:
+                more = len(result.warnings) - 1
+                suffix = f" (and {more} more)" if more else ""
+                self.show_toast(f"{WORKSPACE_FILE}: {result.warnings[0]}{suffix}")
+
+        commands = commands_in(workspace)
+        if commands:
+            heading, body = confirm_text(commands)
+            self._ask(heading, body, "Run", start)
+        else:
+            start()
+
+    def _start_workspace(self, workspace: Workspace) -> None:
+        first_index = self._tab_view.get_n_pages()
+        for tab in workspace.tabs:
+            container = self.new_tab(cwd=first_cwd(tab.layout))
+            container.restore_layout(tab)
+            for pane, state in zip(container.panes(), panes_of(tab.layout), strict=False):
+                if state.command:
+                    pane.type_when_ready(state.command)
+        self._select_tab(first_index)
+        GLib.idle_add(self._refocus_once)  # the other new tabs queued focus grabs; see restore
+
+    def edit_workspace(self, folder: str) -> None:
+        """Start or update ``folder``'s workspace from the current tab, through a small dialog."""
+        container = self._current_container()
+        tab = container.capture() if container is not None else None
+        if tab is None:
+            self.show_toast("Nothing to save in this tab")
+            return
+        existing = None
+        path = os.path.join(folder, WORKSPACE_FILE)
+        if os.path.exists(path):
+            try:
+                existing = Path(path).read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                existing = None
+        draft = make_draft(tab, folder, existing)
+
+        def save(edited: TabState, edit_as_text: bool) -> None:
+            temporary = f"{path}.tmp"
+            try:
+                with open(temporary, "w", encoding="utf-8") as handle:
+                    handle.write(workspace_to_toml(edited, folder))
+                os.replace(temporary, path)
+            except OSError as exc:
+                with contextlib.suppress(OSError):
+                    os.unlink(temporary)
+                self.show_toast(f"Cannot save {WORKSPACE_FILE}: {exc.strerror or exc}")
+                return
+            self.show_toast(f"Saved {WORKSPACE_FILE}")
+            if edit_as_text:
+                self._activate_file(path)
+
+        WorkspaceDialog(folder, draft, save).present(self)
+
+    def _ask(
+        self,
+        heading: str,
+        body: str,
+        yes_label: str,
+        on_yes: Callable[[], None],
+        *,
+        destructive: bool = False,
+    ) -> None:
+        dialog = Adw.AlertDialog(heading=heading, body=body)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("yes", yes_label)
+        appearance = (
+            Adw.ResponseAppearance.DESTRUCTIVE if destructive else Adw.ResponseAppearance.SUGGESTED
+        )
+        dialog.set_response_appearance("yes", appearance)
+        dialog.set_default_response("cancel")
+        dialog.set_close_response("cancel")
+
+        def answered(_dialog: Adw.AlertDialog, response: str) -> None:
+            if response == "yes":
+                on_yes()
+
+        dialog.connect("response", answered)
+        dialog.present(self)
 
     # -- finished commands (general.finished_*) ---------------------------------------------
 

@@ -74,6 +74,24 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   are watching. The tab marker is libadwaita's own "needs attention" indicator and is cleared
   when the tab is selected. If prompt marks (OSC 133) ever land in VTE, the exit status and exact
   start and end could replace the polling.
+- **Workspaces** (`workspace.py`, `.shellac.toml`). A workspace is parsed into the same
+  `TabState`/`SplitState` types session restore uses, so one `replay` rebuilds both; the only
+  addition is `PaneState.command`. The file format is nested `[[tab.pane]]` tables, which read
+  like the layout and cover any split tree; more than two siblings are folded into equal binary
+  splits. It is opened only from the sidebar menu, not the palette, because every palette
+  command must have a default shortcut (and a workspace is tied to a folder anyway). Because
+  the file can arrive with a cloned repository, opening one that would run commands always
+  shows them and asks; there is deliberately no "always trust" yet. Commands are typed into the
+  new shell with `TerminalPane.type_when_ready`: a line sent at once to a starting shell can be
+  lost, so it waits for the prompt to be drawn and the output to go quiet (300 ms), or sends
+  after 4 s to a shell that prints nothing. Starting or updating goes through a small
+  dialog (`workspace_dialog.py`, logic in `workspace.py`: `make_draft`/`build_tab`, GTK-free and
+  tested): the layout always comes from the current tab, while each pane's folder and command
+  come from the existing file when the pane count matches, so updating never loses commands.
+  The dialog is deliberately not a tree editor; "Save and Edit as Text" hands over to the
+  user's editor for anything else. Saving regenerates the file from a commented template, so
+  hand-added comments are lost (the dialog says so). Folders are relative to the workspace
+  folder when inside it.
 
 ## Milestones
 

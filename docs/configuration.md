@@ -206,6 +206,61 @@ program. The name shown is the last program seen in the foreground, so a `make` 
 as the compiler it ran last. Commands run in the background of a shell (`sleep 100 &`) are not
 tracked. Set both options to `false` to turn it off.
 
+## Workspaces
+
+A workspace is a saved layout for a project: tabs, splits, a directory for each pane and,
+if you want, a command to start in it. It lives in a file called `.shellac.toml` in the project
+folder (so you can keep it in version control) and is opened from the sidebar: right-click the
+folder (or the file) and choose **Open Workspace**. The entry only appears where the file exists.
+
+**Starting one.** Arrange a tab the way you like (split, resize), then right-click the project
+folder and choose **Start a Workspace in This Folder…**. A small dialog lists each pane (left,
+top right and so on) with a **Folder** (the button picks one; empty means the project folder
+itself) and a **Command** to type when the pane opens. **Create** writes `.shellac.toml`. The
+file starts with comments that explain every option with examples, so you can also edit it by
+hand: **Save and Edit as Text** in the dialog saves and opens it in your editor (see the
+sidebar settings).
+
+**Updating one.** Where the file exists the menu offers **Update Workspace with Current
+Layout…** instead. The layout comes from the current tab; each pane keeps its folder and
+command from the file as long as the number of panes is the same (otherwise the dialog says
+the panes were re-read from the tab). Saving from the dialog rewrites the whole file, so
+comments you added by hand are not kept; use **Cancel** and edit the file as text to keep them.
+
+```toml
+[[tab]]
+split = "right"                 # "right" is side by side, "down" is stacked
+ratio = 0.35                    # share of the first of two panes (default 0.5)
+[[tab.pane]]
+dir = "api"                     # relative to this folder; "~" and absolute paths work
+run = "nvim ."                  # typed into the new shell
+[[tab.pane]]
+split = "down"                  # a pane that has panes of its own is split again
+[[tab.pane.pane]]
+run = "npm run dev"
+[[tab.pane.pane]]
+dir = "logs"
+focus = true                    # this pane gets the keyboard (default: the first)
+
+[[tab]]                         # a second tab; with no panes it is one terminal
+dir = "web"
+run = "git status"
+```
+
+- A table with no `pane` entries is one terminal (`dir`, `run`, `focus`). A table with `pane`
+  entries is a split (`split`, `ratio`) or a tab. `dir` on a split or tab is the default for
+  everything inside it.
+- More than two panes in one split share the space equally; `ratio` only applies to two.
+- A `dir` that does not exist is reported and the default is used. Mistakes in a value are
+  reported in a short message and the default is used; a file that is not valid TOML opens
+  nothing and says which line is wrong.
+- Opening adds new tabs; it does not touch the ones you have.
+
+**Commands.** A workspace file can come from a repository you cloned, so when a workspace would
+run commands Shellac lists them first and asks. Nothing runs until you press **Run**. The
+commands are typed into the shell as if you had typed them (they appear in your shell history),
+once the shell has printed its prompt.
+
 ## Live reload
 
 The config file and the themes folder are watched. Saving either applies the change to

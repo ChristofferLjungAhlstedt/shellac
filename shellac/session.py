@@ -24,6 +24,7 @@ MAX_PANES = 64  # per tab
 @dataclass(frozen=True)
 class PaneState:
     cwd: str | None  # None: unknown, the pane starts in the home directory
+    command: str | None = None  # typed into the new shell; only workspaces set it (workspace.py)
 
 
 @dataclass(frozen=True)
@@ -93,6 +94,13 @@ def first_cwd(layout: LayoutState) -> str | None:
     while isinstance(layout, SplitState):
         layout = layout.first
     return layout.cwd
+
+
+def panes_of(layout: LayoutState) -> list[PaneState]:
+    """The panes of a layout in tree order, the order ``PaneTree.leaves`` gives after a replay."""
+    if isinstance(layout, SplitState):
+        return panes_of(layout.first) + panes_of(layout.second)
+    return [layout]
 
 
 def pane_count(layout: LayoutState) -> int:
