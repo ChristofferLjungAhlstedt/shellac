@@ -32,7 +32,7 @@ from .keybindings import accelerator_tokens  # noqa: E402
 from .pane_container import PaneContainer  # noqa: E402
 from .pane_tree import Axis, Direction  # noqa: E402
 from .search_bar import SearchBar  # noqa: E402
-from .session import SessionState, first_cwd, panes_of  # noqa: E402
+from .session import SessionState, TabState, first_cwd, panes_of  # noqa: E402
 from .settings_window import SettingsWindow  # noqa: E402
 from .shell import resolve_working_directory  # noqa: E402
 from .state import MAX_WIDTH, MIN_WIDTH, load_state, save_state  # noqa: E402
@@ -44,10 +44,12 @@ from .workspace import (  # noqa: E402
     Workspace,
     commands_in,
     confirm_text,
+    make_draft,
     parse_workspace,
     workspace_file,
     workspace_to_toml,
 )
+from .workspace_dialog import WorkspaceDialog  # noqa: E402
 
 MAX_TAB_SHORTCUTS = 9
 FOLLOW_DEBOUNCE_MS = 150  # wait for rapid directory changes to settle (section 8.4)
@@ -142,7 +144,7 @@ class MainWindow(Adw.ApplicationWindow):
             on_activate=self._on_sidebar_activate,
             on_open_tab=lambda path: self.new_tab(cwd=path),
             on_open_workspace=self.open_workspace,
-            on_save_workspace=self.save_workspace,
+            on_edit_workspace=self.edit_workspace,
             on_message=self.show_toast,
             on_leave=self._focus_current,
             on_pin_changed=self._on_pin_changed,
@@ -365,21 +367,27 @@ class MainWindow(Adw.ApplicationWindow):
         self._select_tab(first_index)
         GLib.idle_add(self._refocus_once)  # the other new tabs queued focus grabs; see restore
 
-    def save_workspace(self, folder: str) -> None:
-        """Write the current tab's splits and directories to ``folder``'s workspace file."""
+    def edit_workspace(self, folder: str) -> None:
+        """Start or update ``folder``'s workspace from the current tab, through a small dialog."""
         container = self._current_container()
         tab = container.capture() if container is not None else None
         if tab is None:
             self.show_toast("Nothing to save in this tab")
             return
+        existing = None
         path = os.path.join(folder, WORKSPACE_FILE)
-        text = workspace_to_toml(tab, folder)
+        if os.path.exists(path):
+            try:
+                existing = Path(path).read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                existing = None
+        draft = make_draft(tab, folder, existing)
 
-        def write() -> None:
+        def save(edited: TabState, edit_as_text: bool) -> None:
             temporary = f"{path}.tmp"
             try:
                 with open(temporary, "w", encoding="utf-8") as handle:
-                    handle.write(text)
+                    handle.write(workspace_to_toml(edited, folder))
                 os.replace(temporary, path)
             except OSError as exc:
                 with contextlib.suppress(OSError):
@@ -387,18 +395,10 @@ class MainWindow(Adw.ApplicationWindow):
                 self.show_toast(f"Cannot save {WORKSPACE_FILE}: {exc.strerror or exc}")
                 return
             self.show_toast(f"Saved {WORKSPACE_FILE}")
+            if edit_as_text:
+                self._activate_file(path)
 
-        if os.path.exists(path):
-            self._ask(
-                "Replace the workspace?",
-                f"This folder already has a {WORKSPACE_FILE}. Saving replaces it with the layout "
-                "of this tab. Commands in the old file are not kept.",
-                "Replace",
-                write,
-                destructive=True,
-            )
-        else:
-            write()
+        WorkspaceDialog(folder, draft, save).present(self)
 
     def _ask(
         self,

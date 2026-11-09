@@ -3,10 +3,16 @@ from pathlib import Path
 from shellac.pane_tree import Axis
 from shellac.session import PaneState, SplitState, TabState, panes_of
 from shellac.workspace import (
+    HEADER,
     MAX_COMMANDS_SHOWN,
     WORKSPACE_FILE,
+    PaneValues,
+    build_tab,
     commands_in,
     confirm_text,
+    folder_text,
+    make_draft,
+    pane_positions,
     parse_workspace,
     workspace_file,
     workspace_to_toml,
@@ -225,3 +231,146 @@ def test_odd_characters_in_a_directory_survive_the_round_trip(tmp_path: Path):
     folder = str(tmp_path)
     tab = TabState(SplitState(Axis.VERTICAL, 0.5, PaneState(str(odd)), PaneState(folder)))
     assert parse_workspace(workspace_to_toml(tab, folder), folder).workspace.tabs == (tab,)
+
+
+# -- the template and the editing dialog -----------------------------------------------------
+
+
+def three_panes(folder: str) -> TabState:
+    return TabState(
+        SplitState(
+            Axis.HORIZONTAL,
+            0.3,
+            PaneState(f"{folder}/api"),
+            SplitState(Axis.VERTICAL, 0.5, PaneState(f"{folder}/web"), PaneState(folder)),
+        )
+    )
+
+
+def test_a_new_file_explains_itself(tmp_path: Path):
+    folder = project(tmp_path)
+    text = workspace_to_toml(three_panes(folder), folder)
+    assert text.startswith(HEADER)
+    for hint in (
+        'split = "right"',
+        "ratio",
+        'dir   = "api"',
+        'run   = "npm run dev"',
+        "focus = true",
+    ):
+        assert hint in text, hint
+    assert "Open Workspace" in text and "another [[tab]]" in text
+    assert text.count('# run = "command to type when this pane opens"') == 3
+
+
+def test_the_hint_is_left_out_where_a_command_exists(tmp_path: Path):
+    folder = project(tmp_path)
+    tab = TabState(SplitState(Axis.HORIZONTAL, 0.5, PaneState(folder, "make"), PaneState(folder)))
+    text = workspace_to_toml(tab, folder)
+    assert text.count('# run = "command to type') == 1 and 'run = "make"' in text
+    assert parse_workspace(text, folder).workspace.tabs == (tab,)
+
+
+def test_the_template_is_valid_and_reads_back_with_focus(tmp_path: Path):
+    folder = project(tmp_path)
+    tab = TabState(three_panes(folder).layout, focused=2)
+    text = workspace_to_toml(tab, folder)
+    assert text.splitlines().count("focus = true") == 1  # the header only mentions it
+    result = parse_workspace(text, folder)
+    assert result.warnings == () and result.workspace.tabs == (tab,)
+    first_focused = workspace_to_toml(three_panes(folder), folder)  # the first pane is the default
+    assert "focus = true" not in first_focused.splitlines()
+
+
+def test_folder_text(tmp_path: Path):
+    folder = str(tmp_path)
+    assert folder_text(folder, folder) == ""
+    assert folder_text(f"{folder}/api/v1", folder) == "api/v1"
+    assert folder_text("/elsewhere", folder) == "/elsewhere"
+    assert folder_text(None, folder) == ""
+
+
+def test_starting_uses_the_current_directories_and_no_commands(tmp_path: Path):
+    folder = project(tmp_path)
+    draft = make_draft(three_panes(folder), folder, None)
+    assert draft.existing is False and draft.note is None
+    assert draft.values == (PaneValues("api", ""), PaneValues("web", ""), PaneValues("", ""))
+
+
+def test_updating_keeps_folders_and_commands_when_the_panes_match(tmp_path: Path):
+    folder = project(tmp_path)
+    old = """
+[[tab]]
+[[tab.pane]]
+dir = "logs"
+run = "tail -f app.log"
+[[tab.pane]]
+split = "down"
+[[tab.pane.pane]]
+run = "npm run dev"
+[[tab.pane.pane]]
+dir = "web"
+"""
+    draft = make_draft(three_panes(folder), folder, old)
+    assert draft.existing is True
+    assert draft.values == (
+        PaneValues("logs", "tail -f app.log"),
+        PaneValues("", "npm run dev"),
+        PaneValues("web", ""),
+    )
+    assert draft.shape.layout.ratio == 0.3  # the layout is the current tab's
+    assert "comments you added are not kept" in draft.note
+
+
+def test_updating_to_a_different_number_of_panes_starts_over_and_says_so(tmp_path: Path):
+    folder = project(tmp_path)
+    draft = make_draft(three_panes(folder), folder, '[[tab]]\nrun = "make"\n')
+    assert draft.values == (PaneValues("api", ""), PaneValues("web", ""), PaneValues("", ""))
+    assert "3 panes and the saved workspace has 1" in draft.note
+
+
+def test_a_file_with_several_tabs_is_flagged(tmp_path: Path):
+    folder = project(tmp_path)
+    draft = make_draft(TabState(PaneState(folder)), folder, "[[tab]]\n[[tab]]\n[[tab]]\n")
+    assert "3 tabs; only this tab is kept" in draft.note
+
+
+def test_an_unreadable_file_is_replaced_with_a_note(tmp_path: Path):
+    folder = project(tmp_path)
+    draft = make_draft(TabState(PaneState(folder)), folder, "[[tab]\n")
+    assert draft.existing and "could not be read" in draft.note
+
+
+def test_build_tab_applies_the_values_in_order(tmp_path: Path):
+    folder = project(tmp_path)
+    shape = three_panes(folder)
+    values = [PaneValues("web", "a"), PaneValues("", " b "), PaneValues("logs", "")]
+    tab, problems = build_tab(shape, folder, values)
+    assert problems == {}
+    assert [(p.cwd, p.command) for p in panes_of(tab.layout)] == [
+        (f"{folder}/web", "a"),
+        (folder, "b"),
+        (f"{folder}/logs", None),
+    ]
+    assert tab.layout.ratio == 0.3 and tab.layout.axis == Axis.HORIZONTAL
+
+
+def test_build_tab_reports_every_bad_folder_and_builds_nothing(tmp_path: Path):
+    folder = project(tmp_path)
+    values = [PaneValues("nope", ""), PaneValues("", ""), PaneValues("also/missing", "")]
+    tab, problems = build_tab(three_panes(folder), folder, values)
+    assert tab is None and sorted(problems) == [0, 2]
+    assert "nope is not a folder" in problems[0]
+
+
+def test_pane_positions_name_where_each_pane_is(tmp_path: Path):
+    folder = str(tmp_path)
+    assert pane_positions(PaneState(folder)) == ["Only pane"]
+    assert pane_positions(three_panes(folder).layout) == ["Left", "Top right", "Bottom right"]
+    grid = SplitState(
+        Axis.VERTICAL,
+        0.5,
+        SplitState(Axis.HORIZONTAL, 0.5, PaneState("a"), PaneState("b")),
+        SplitState(Axis.HORIZONTAL, 0.5, PaneState("c"), PaneState("d")),
+    )
+    assert pane_positions(grid) == ["Top left", "Top right", "Bottom left", "Bottom right"]

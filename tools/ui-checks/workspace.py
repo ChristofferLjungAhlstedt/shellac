@@ -136,7 +136,10 @@ def a1():
     check("menu does not offer it elsewhere",
           "Open Workspace" not in menu_labels(side._build_menu(there))
           and "Open Workspace" not in menu_labels(side._build_menu(inside)))
-    check("menu always offers saving", "Save Tab as Workspace…" in menu_labels(side._build_menu(there)))
+    check("no file: offers to start one", "Start a Workspace in This Folder…" in menu_labels(side._build_menu(there)))
+    check("file: offers to update it", "Update Workspace with Current Layout…" in menu_labels(side._build_menu(here))
+          and "Start a Workspace in This Folder…" not in menu_labels(side._build_menu(here)))
+    check("old wording is gone", "Save Tab as Workspace…" not in menu_labels(side._build_menu(there)))
     win().open_workspace(BASE)
 
 
@@ -187,44 +190,80 @@ def a6():
     shot("workspace_opened")
 
 
+def rows():
+    d = dialog()
+    return d.folder_rows, d.command_rows
+
+
 def b1():
-    # Saving: the current tab (3 panes) into a folder without a workspace file.
+    # Starting a workspace from the current tab (3 panes) in a folder without a file.
     check("no file there yet", not os.path.exists(f"{OTHER}/{WORKSPACE_FILE}"))
-    win().save_workspace(OTHER)
+    win().edit_workspace(OTHER)
 
 
 def b2():
-    path = f"{OTHER}/{WORKSPACE_FILE}"
-    check("save writes the file at once when none exists", os.path.exists(path) and dialog() is None)
-    text = read(path) if os.path.exists(path) else ""
-    result = parse_workspace(text, OTHER)
-    check("and it reads back as the same shape", result.workspace is not None and
-          isinstance(result.workspace.tabs[0].layout, SplitState)
-          and abs(result.workspace.tabs[0].layout.ratio - 0.3) < 0.02, str(result.error))
-    check("directories outside the folder stay absolute", f'dir = "{real(BASE)}/api"' in text or f'{BASE}/api' in text, text)
-    state["saved"] = text
-    win().save_workspace(OTHER)  # again: the file exists now
+    d = dialog()
+    check("the start dialog opens", d is not None and d.get_title() == "Start a workspace")
+    if d is None:
+        return
+    folders, commands = rows()
+    check("one folder and one command per pane", len(folders) == 3 and len(commands) == 3)
+    check("folders prefilled from the panes", folders[0].get_text().endswith("api"), folders[0].get_text())
+    check("no commands yet", all(c.get_text() == "" for c in commands))
+    check("a clear button label", any(b.get_label() == "Create" for b in buttons(d)))
+    shot("workspace_dialog_start")
+    commands[0].set_text("echo HI")
+    folders[2].set_text("")
+    press("Create")
 
 
 def b3():
-    d = dialog()
-    check("saving over a file asks first", d is not None)
-    if d is not None:
-        check("and warns that commands are lost", "Commands" in d.get_body(), d.get_body())
-        press("Cancel")
+    path = f"{OTHER}/{WORKSPACE_FILE}"
+    check("Create writes the file and closes", os.path.exists(path) and dialog() is None)
+    text = read(path) if os.path.exists(path) else ""
+    check("it starts with explaining comments", text.startswith("#") and "Open Workspace" in text)
+    result = parse_workspace(text, OTHER)
+    check("and reads back", result.workspace is not None, str(result.error))
+    check("the command is written", 'run = "echo HI"' in text, text)
+    check("panes without a command get a hint", "# run =" in text)
+    win().edit_workspace(OTHER)
 
 
 def b4():
-    check("Cancel leaves the file alone", read(f"{OTHER}/{WORKSPACE_FILE}") == state["saved"])
-    win().save_workspace(OTHER)
+    d = dialog()
+    check("the update dialog opens", d is not None and d.get_title() == "Update workspace")
+    if d is None:
+        return
+    folders, commands = rows()
+    check("update keeps each pane's command", commands[0].get_text() == "echo HI", commands[0].get_text())
+    check("and warns that comments are not kept", "comments" in d._draft.note)
+    shot("workspace_dialog_update")
+    folders[1].set_text("no-such-folder")
+    press("Update")
 
 
 def b5():
-    press("Replace")
+    d = dialog()
+    check("a missing folder keeps the dialog open", d is not None)
+    if d is None:
+        return
+    folders, _ = rows()
+    check("and marks that row", folders[1].has_css_class("error"), folders[1].get_title())
+    check("other rows are not marked", not folders[0].has_css_class("error"))
+    shot("workspace_dialog_error")
+    folders[1].set_text("")
+    check("editing clears the mark", not folders[1].has_css_class("error"))
+    state["tabs"] = len(containers())
+    win()._activate_file = lambda path: state.__setitem__("activated", path)  # editor is user config
+    press("Save and Edit as Text")
 
 
 def b6():
-    check("Replace saves again", dialog() is None and os.path.exists(f"{OTHER}/{WORKSPACE_FILE}"))
+    check("Save and Edit as Text closes the dialog", dialog() is None)
+    text = read(f"{OTHER}/{WORKSPACE_FILE}")
+    check("the file was saved", 'run = "echo HI"' in text and "no-such-folder" not in text)
+    check("and handed to the editor setting", state.get("activated") == f"{OTHER}/{WORKSPACE_FILE}",
+          str(state.get("activated")))
     # A file that cannot be read as a workspace opens nothing and asks nothing.
     with open(f"{OTHER}/{WORKSPACE_FILE}", "w") as handle:
         handle.write('[[tab]]\nrun = "unterminated\n')
@@ -255,7 +294,7 @@ def c3():
 state: dict = {}
 STEPS = [
     (a1, 800), (a2, 500), (a3, 600), (a4, 500), (a5, 3500), (a6, 500),
-    (b1, 800), (b2, 800), (b3, 500), (b4, 800), (b5, 800), (b6, 800),
+    (b1, 800), (b2, 800), (b3, 800), (b4, 800), (b5, 800), (b6, 1000),
     (c1, 800), (c2, 800), (c3, 300),
 ]
 idx = [0]

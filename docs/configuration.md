@@ -213,9 +213,19 @@ if you want, a command to start in it. It lives in a file called `.shellac.toml`
 folder (so you can keep it in version control) and is opened from the sidebar: right-click the
 folder (or the file) and choose **Open Workspace**. The entry only appears where the file exists.
 
-The quickest start is **Save Tab as Workspace…** in the same menu. It writes the current tab's
-splits, divider positions and directories to that folder. Commands cannot be saved, because
-Shellac does not know what you typed; add them by hand.
+**Starting one.** Arrange a tab the way you like (split, resize), then right-click the project
+folder and choose **Start a Workspace in This Folder…**. A small dialog lists each pane (left,
+top right and so on) with a **Folder** (the button picks one; empty means the project folder
+itself) and a **Command** to type when the pane opens. **Create** writes `.shellac.toml`. The
+file starts with comments that explain every option with examples, so you can also edit it by
+hand: **Save and Edit as Text** in the dialog saves and opens it in your editor (see the
+sidebar settings).
+
+**Updating one.** Where the file exists the menu offers **Update Workspace with Current
+Layout…** instead. The layout comes from the current tab; each pane keeps its folder and
+command from the file as long as the number of panes is the same (otherwise the dialog says
+the panes were re-read from the tab). Saving from the dialog rewrites the whole file, so
+comments you added by hand are not kept; use **Cancel** and edit the file as text to keep them.
 
 ```toml
 [[tab]]

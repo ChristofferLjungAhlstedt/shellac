@@ -84,9 +84,14 @@ Where the spec was ambiguous, the simplest behavior was chosen:
   shows them and asks; there is deliberately no "always trust" yet. Commands are typed into the
   new shell with `TerminalPane.type_when_ready`: a line sent at once to a starting shell can be
   lost, so it waits for the prompt to be drawn and the output to go quiet (300 ms), or sends
-  after 4 s to a shell that prints nothing. Saving writes only what Shellac knows: layout,
-  ratios and directories (relative to the folder when inside it); it asks before replacing a
-  file, since the old commands would be lost.
+  after 4 s to a shell that prints nothing. Starting or updating goes through a small
+  dialog (`workspace_dialog.py`, logic in `workspace.py`: `make_draft`/`build_tab`, GTK-free and
+  tested): the layout always comes from the current tab, while each pane's folder and command
+  come from the existing file when the pane count matches, so updating never loses commands.
+  The dialog is deliberately not a tree editor; "Save and Edit as Text" hands over to the
+  user's editor for anything else. Saving regenerates the file from a commented template, so
+  hand-added comments are lost (the dialog says so). Folders are relative to the workspace
+  folder when inside it.
 
 ## Milestones
 
